@@ -1,0 +1,16 @@
+# Claude Code local, machine-specific settings (not shared)
+.claude/settings.local.json
+
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+.vscode/
+
+# Node (in case Frontend/Backend get scaffolded later)
+node_modules/
+dist/
+build/
+.env
+.env.local
