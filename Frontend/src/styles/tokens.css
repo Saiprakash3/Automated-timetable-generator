@@ -1,0 +1,263 @@
+/*
+  Design tokens — transcribed from Design System/FOUNDATIONS.md (2026-07-17).
+
+  Scope note: a large part of FOUNDATIONS.md's scale (spacing, border widths,
+  most shadow levels, icon sizes, container widths, breakpoints, and 5 of the
+  named durations) already matches Tailwind's built-in defaults exactly —
+  e.g. our --duration-default (200ms) IS Tailwind's `duration-200`, our
+  --icon-sm (16px) IS Tailwind's `size-4`. Those are NOT redeclared here;
+  redeclaring a value Tailwind already provides is a token that can drift
+  out of sync with itself. Only what genuinely diverges from Tailwind's
+  defaults, or doesn't exist there at all (the color system, our exact
+  type scale, custom easings, named z-index), gets a token below.
+
+  See each section's comment for the Tailwind-default mapping where one
+  applies, so nobody re-adds a redundant token later.
+*/
+
+:root {
+  /* ============================================================
+     §10.1 — Base color tokens (7 palettes × 11 stops)
+     Stored as full hsl() functions (not bare "H S% L%" triplets) —
+     FOUNDATIONS §1.2 describes the older shadcn convention of a bare
+     triplet + a wrapper applied at consumption time, but the shadcn/
+     Tailwind v4 tooling actually installed here stores complete color
+     functions directly in the variable (it generated oklch(...) values
+     for its own placeholders). Using hsl(...) directly renders IDENTICAL
+     colors to the bare-triplet approach and is fully compatible with
+     how @theme inline (in index.css) consumes these — only the wrapper
+     syntax differs, not a single specified hue/saturation/lightness value.
+     ============================================================ */
+
+  /* Neutral — seed #5B6472 @ 600 */
+  --neutral-50: hsl(180 9% 98%);
+  --neutral-100: hsl(210 7% 95%);
+  --neutral-200: hsl(220 9% 87%);
+  --neutral-300: hsl(216 8% 76%);
+  --neutral-400: hsl(217 10% 64%);
+  --neutral-500: hsl(215 10% 51%);
+  --neutral-600: hsl(217 11% 40%);
+  --neutral-700: hsl(218 11% 30%);
+  --neutral-800: hsl(216 10% 20%);
+  --neutral-900: hsl(220 10% 12%);
+  --neutral-950: hsl(210 10% 4%);
+
+  /* Primary — seed #3454D1 @ 600 */
+  --primary-50: hsl(240 40% 98%);
+  --primary-100: hsl(230 50% 95%);
+  --primary-200: hsl(228 51% 89%);
+  --primary-300: hsl(228 54% 81%);
+  --primary-400: hsl(227 56% 70%);
+  --primary-500: hsl(228 60% 60%);
+  --primary-600: hsl(228 63% 51%);
+  --primary-700: hsl(228 58% 37%);
+  --primary-800: hsl(228 53% 25%);
+  --primary-900: hsl(229 49% 15%);
+  --primary-950: hsl(228 50% 4%);
+
+  /* Teal ("Secondary" palette, but never named --secondary-* — that's
+     shadcn's own neutral-gray button slot. Domain-accent only. */
+  --teal-50: hsl(150 20% 98%);
+  --teal-100: hsl(180 12% 94%);
+  --teal-200: hsl(175 15% 84%);
+  --teal-300: hsl(177 16% 71%);
+  --teal-400: hsl(177 17% 55%);
+  --teal-500: hsl(177 19% 40%);
+  --teal-600: hsl(178 19% 32%);
+  --teal-700: hsl(174 18% 23%);
+  --teal-800: hsl(180 16% 16%);
+  --teal-900: hsl(172 15% 10%);
+  --teal-950: hsl(180 14% 4%);
+
+  /* Success — seed #2F9E5B @ 600 */
+  --success-50: hsl(150 40% 98%);
+  --success-100: hsl(144 36% 95%);
+  --success-200: hsl(144 41% 87%);
+  --success-300: hsl(144 43% 76%);
+  --success-400: hsl(144 47% 64%);
+  --success-500: hsl(144 51% 52%);
+  --success-600: hsl(144 54% 40%);
+  --success-700: hsl(144 52% 29%);
+  --success-800: hsl(144 48% 20%);
+  --success-900: hsl(144 45% 12%);
+  --success-950: hsl(140 43% 4%);
+
+  /* Warning — seed #D98C2B @ 400 */
+  --warning-50: hsl(30 60% 98%);
+  --warning-100: hsl(33 53% 93%);
+  --warning-200: hsl(33 58% 82%);
+  --warning-300: hsl(34 63% 68%);
+  --warning-400: hsl(33 70% 51%);
+  --warning-500: hsl(33 66% 41%);
+  --warning-600: hsl(33 62% 32%);
+  --warning-700: hsl(21 67% 33%);
+  --warning-800: hsl(34 57% 16%);
+  --warning-900: hsl(33 55% 10%);
+  --warning-950: hsl(36 50% 4%);
+
+  /* Danger — seed #D94A4A @ 500 */
+  --danger-50: hsl(0 45% 98%);
+  --danger-100: hsl(0 52% 95%);
+  --danger-200: hsl(0 54% 88%);
+  --danger-300: hsl(0 57% 79%);
+  --danger-400: hsl(0 62% 68%);
+  --danger-500: hsl(0 65% 57%);
+  --danger-600: hsl(0 56% 51%);
+  --danger-700: hsl(0 57% 42%);
+  --danger-800: hsl(0 52% 22%);
+  --danger-900: hsl(0 49% 13%);
+  --danger-950: hsl(0 50% 4%);
+
+  /* Info — seed #3B82C4 @ 500 */
+  --info-50: hsl(210 40% 98%);
+  --info-100: hsl(210 43% 95%);
+  --info-200: hsl(208 43% 86%);
+  --info-300: hsl(209 46% 76%);
+  --info-400: hsl(209 50% 63%);
+  --info-500: hsl(209 54% 50%);
+  --info-600: hsl(210 59% 39%);
+  --info-700: hsl(209 48% 29%);
+  --info-800: hsl(209 45% 20%);
+  --info-900: hsl(208 43% 12%);
+  --info-950: hsl(210 40% 4%);
+
+  /* ============================================================
+     §10.2 — Semantic aliases
+     These use shadcn's own expected slot names (background, primary,
+     ring, radius, ...) directly, so they flow into the @theme inline
+     mapping already written in index.css with no renaming needed.
+     Superseded shadcn's own generated placeholder values entirely —
+     see the note at the top of index.css.
+     ============================================================ */
+
+  --background: var(--neutral-50);
+  --foreground: var(--neutral-900);
+  --card: var(--neutral-50);
+  --card-foreground: var(--neutral-900);
+  --popover: var(--neutral-50);
+  --popover-foreground: var(--neutral-900);
+
+  --primary: var(--primary-600); /* 6.30:1 with white text */
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: var(--neutral-100); /* shadcn's neutral secondary button — NOT teal */
+  --secondary-foreground: var(--neutral-900);
+  --accent: var(--neutral-100);
+  --accent-foreground: var(--neutral-900);
+  --muted: var(--neutral-100);
+  --muted-foreground: var(--neutral-600); /* neutral-500 fails AA at 3.95:1 — 600 is the floor */
+
+  --border: var(--neutral-200);
+  --input: var(--neutral-200);
+  --ring: var(--primary-600); /* FOUNDATIONS §5.2 calls this role --ring-color; named --ring to match shadcn's slot */
+
+  --destructive: var(--danger-700); /* 6.28–6.83:1 — 700 not 600, safer margin for Publish-confirmation stakes */
+  --destructive-foreground: hsl(0 0% 100%);
+  --success-solid: var(--success-700);
+  --success-solid-foreground: hsl(0 0% 100%);
+  --warning-solid: var(--warning-700);
+  --warning-solid-foreground: hsl(0 0% 100%);
+  --info-solid: var(--info-600);
+  --info-solid-foreground: hsl(0 0% 100%);
+  --teal-solid: var(--teal-600);
+  --teal-solid-foreground: hsl(0 0% 100%);
+
+  /* Light-bg / dark-text pairs — badges, toasts, conflict badges (5.3–8.2:1 verified) */
+  --success-fg: var(--success-700);
+  --success-bg: var(--success-100);
+  --warning-fg: var(--warning-700);
+  --warning-bg: var(--warning-100);
+  --danger-fg: var(--danger-700);
+  --danger-bg: var(--danger-100);
+  --info-fg: var(--info-700);
+  --info-bg: var(--info-100);
+  --teal-fg: var(--teal-700);
+  --teal-bg: var(--teal-100);
+
+  /* Status Pill (DESIGN_PRINCIPLES.md) */
+  --status-draft-bg: var(--neutral-100);
+  --status-draft-fg: var(--neutral-700);
+  --status-pending-bg: var(--warning-100);
+  --status-pending-fg: var(--warning-700);
+  --status-approved-bg: var(--success-100);
+  --status-approved-fg: var(--success-700);
+  --status-published-bg: var(--primary-100); /* Published is Primary, not Success — see FRONTEND_DOCUMENTATION_CHECKLIST.md §6 */
+  --status-published-fg: var(--primary-700);
+
+  /* Conflict Badge — 3 severity tiers (INTERACTION_DECISIONS.md §1.3) */
+  --conflict-blocking-bg: var(--danger-100);
+  --conflict-blocking-fg: var(--danger-700);
+  --conflict-blocking-border: var(--danger-500);
+  --conflict-warning-bg: var(--warning-100);
+  --conflict-warning-fg: var(--warning-700);
+  --conflict-warning-border: var(--warning-500);
+  --conflict-info-bg: var(--info-100);
+  --conflict-info-fg: var(--info-700);
+  --conflict-info-border: var(--info-500);
+
+  /* §3 Border radii — base value only; the derived sm/md/lg/xl scale
+     is fixed directly in index.css's @theme inline block (FOUNDATIONS §3.1
+     needs exact 4/6/8/12px, not shadcn's default proportional calc chain). */
+  --radius: 0.375rem; /* 6px */
+
+  /* §5.3 Backdrop for overlays — not a token. Tailwind's `bg-black/50`
+     utility already produces exactly hsl(0 0% 0% / 0.5); no CSS var earns
+     its keep for a value that's just a Tailwind opacity modifier. */
+}
+
+/* ============================================================
+   Theme extensions — things Tailwind has no default for at all,
+   or where our exact value differs from Tailwind's own default.
+   Anything inside @theme also generates a matching utility class
+   (e.g. --ease-standard below → the `ease-standard` class).
+   ============================================================ */
+@theme {
+  /* §11 Typography — DM Sans (headings/UI) + Inter (body) */
+  --font-heading: "DM Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  /* Body (16px) = Tailwind's text-base, Body Small (14px) = text-sm,
+     Label (12px) = text-xs — all exact matches, not redeclared.
+     H1/H2/H3 have no Tailwind-default equivalent name, so they're new. */
+  --text-h1: 2rem; /* 32px */
+  --text-h1--line-height: 1.25;
+  --text-h2: 1.5rem; /* 24px */
+  --text-h2--line-height: 1.25;
+  --text-h3: 1.25rem; /* 20px */
+  --text-h3--line-height: 1.5;
+  /* Font weight isn't paired automatically — apply Tailwind's existing
+     font-semibold (H1/H2) or font-medium (H3/Label) alongside these.
+     Recipe: className="text-h1 font-semibold font-heading" */
+
+  /* Tailwind's own leading-tight (1.25) and leading-normal (1.5) already
+     match FOUNDATIONS §11.1 exactly. Only "loose" differs from Tailwind's
+     default (2) — FOUNDATIONS wants 1.75. */
+  --leading-loose: 1.75;
+
+  /* Tailwind's tracking-normal (0) already matches. tight/wide differ
+     from Tailwind's defaults (-0.025em / 0.025em vs. our -0.01em / 0.02em). */
+  --tracking-tight: -0.01em;
+  --tracking-wide: 0.02em;
+
+  /* §6.2 Easings — Tailwind has no named curves matching these at all.
+     Durations (§6.1) are NOT redeclared: --duration-instant/fast/default/
+     moderate/slow map exactly to Tailwind's built-in duration-75/150/200/300/500. */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasized: cubic-bezier(0.4, 0, 0, 1);
+
+  /* §8 Z-index — named so "why is my modal behind the toast" bugs can't
+     happen from a bare number. Values match FOUNDATIONS §8 exactly; they
+     also happen to align with Tailwind's numeric z-* scale, but the point
+     is the semantic name, not the number. */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-fixed: 30;
+  --z-drawer-overlay: 40;
+  --z-drawer: 50;
+  --z-toast: 60;
+  --z-modal-overlay: 70;
+  --z-modal: 80;
+  --z-tooltip: 90;
+}

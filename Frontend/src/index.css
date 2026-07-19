@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* FOUNDATIONS.md §11.2 — exactly 4 font files: DM Sans Medium + Semibold,
+   Inter Regular + Medium ("keeping font-loading light" is explicit there,
+   hence static per-weight files, not the full variable font). */
+@import "@fontsource/dm-sans/500.css"; /* H3, Label */
+@import "@fontsource/dm-sans/600.css"; /* H1, H2 */
+@import "@fontsource/inter/400.css"; /* Body, Body Small */
+@import "@fontsource/inter/500.css"; /* emphasis within body text */
+
+/* No dark mode: nothing in the design system (FOUNDATIONS.md, DESIGN_PRINCIPLES.md,
+   COMPONENTS.md) specifies a dark palette or a dark-mode requirement — only one
+   confirmed color set exists. Not scaffolding an unused .dark{} block/toggle for a
+   mode nobody asked for. Add it properly (real dark-palette values, not guesses)
+   if it's ever actually requested. */
+
+@theme inline {
+  /* Fonts need no entry here — --font-heading/--font-body are already
+     real theme keys, declared directly in tokens.css's @theme{} block
+     (Tailwind's font-family namespace IS --font-*, no remapping step
+     needed). This inline block only remaps plain semantic vars into
+     Tailwind's --color-* namespace, which colors DO need. */
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* Extra semantic tokens beyond shadcn's own set (FOUNDATIONS.md §10.2) —
+     registered here so domain components get real utility classes
+     (bg-status-approved-bg, stroke-success-solid, ...) instead of each one
+     reaching for arbitrary-value syntax or inline styles individually. */
+  --color-success-solid: var(--success-solid);
+  --color-success-solid-foreground: var(--success-solid-foreground);
+  --color-warning-solid: var(--warning-solid);
+  --color-warning-solid-foreground: var(--warning-solid-foreground);
+  --color-info-solid: var(--info-solid);
+  --color-info-solid-foreground: var(--info-solid-foreground);
+  --color-teal-solid: var(--teal-solid);
+  --color-teal-solid-foreground: var(--teal-solid-foreground);
+
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-teal-fg: var(--teal-fg);
+  --color-teal-bg: var(--teal-bg);
+
+  --color-status-draft-bg: var(--status-draft-bg);
+  --color-status-draft-fg: var(--status-draft-fg);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-fg: var(--status-pending-fg);
+  --color-status-approved-bg: var(--status-approved-bg);
+  --color-status-approved-fg: var(--status-approved-fg);
+  --color-status-published-bg: var(--status-published-bg);
+  --color-status-published-fg: var(--status-published-fg);
+
+  --color-conflict-blocking-bg: var(--conflict-blocking-bg);
+  --color-conflict-blocking-fg: var(--conflict-blocking-fg);
+  --color-conflict-blocking-border: var(--conflict-blocking-border);
+  --color-conflict-warning-bg: var(--conflict-warning-bg);
+  --color-conflict-warning-fg: var(--conflict-warning-fg);
+  --color-conflict-warning-border: var(--conflict-warning-border);
+  --color-conflict-info-bg: var(--conflict-info-bg);
+  --color-conflict-info-fg: var(--conflict-info-fg);
+  --color-conflict-info-border: var(--conflict-info-border);
+
+  /* Base palette stops used directly in a few places (e.g. warning-500 for
+     a border-left accent, where the semantic alias layer doesn't have a
+     matching role). Only the stops actually consumed somewhere — not the
+     full 77-stop base palette, which stays arbitrary-value/var()-only. */
+  --color-warning-500: var(--warning-500);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-700: var(--neutral-700);
+
+  /* FOUNDATIONS §3.1 needs exact 4/6/8/12px — not shadcn's default
+     proportional calc() chain off a single --radius value. */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: var(--radius); /* 6px — the base value */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.75rem; /* 12px */
+  /* --radius-none and --radius-full aren't custom tokens — Tailwind's
+     built-in rounded-none / rounded-full already cover those exactly. */
+
+  /* z-index utilities need Tailwind's own --z-index-* namespace to
+     generate real z-N classes — a bare --z-* inside tokens.css's @theme{}
+     block (§8) doesn't register as the z-index category at all, so every
+     z-sticky/z-dropdown/z-fixed/z-drawer/z-toast/z-modal/z-tooltip class
+     in the app was silently resolving to computed z-index: auto. Remapped
+     here, same pattern as the color remapping above. */
+  --z-index-base: var(--z-base);
+  --z-index-sticky: var(--z-sticky);
+  --z-index-dropdown: var(--z-dropdown);
+  --z-index-fixed: var(--z-fixed);
+  --z-index-drawer-overlay: var(--z-drawer-overlay);
+  --z-index-drawer: var(--z-drawer);
+  --z-index-toast: var(--z-toast);
+  --z-index-modal-overlay: var(--z-modal-overlay);
+  --z-index-modal: var(--z-modal);
+  --z-index-tooltip: var(--z-tooltip);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+  h1, h2, h3 {
+    @apply font-heading;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "timetable-mock-backend",
+  "version": "1.0.0",
+  "description": "Throwaway mock backend for frontend development. Not the real backend.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  }
+}

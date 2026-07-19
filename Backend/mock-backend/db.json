@@ -1,0 +1,91 @@
+{
+  "users": [
+    { "id": "A001", "password": "admin123", "role": "admin", "name": "Suresh Patnaik", "department": "Administration" },
+    { "id": "H001", "password": "hod123", "role": "hod", "name": "Dr. Lakshmi Prasad", "department": "CSE" },
+    { "id": "F1023", "password": "fac123", "role": "faculty", "name": "Dr. Ramesh Kumar", "department": "CSE" },
+    { "id": "F1088", "password": "fac123", "role": "faculty", "name": "Dr. Anitha Rao", "department": "CSE" },
+    { "id": "F1099", "password": "fac123", "role": "faculty", "name": "Dr. Vijay Singh", "department": "CSE" },
+    { "id": "LC004", "password": "labco123", "role": "lab_coordinator", "name": "K. Srinivas", "department": "CSE" },
+    { "id": "LC005", "password": "labco123", "role": "lab_coordinator", "name": "Dr. Anitha Rao", "department": "CSE", "note": "also has Faculty record F1088 - overlap case" },
+    { "id": "S3021", "password": "stu123", "role": "student", "name": "P. Naveen", "department": "CSE", "year": 3, "section": "A" }
+  ],
+
+  "timetables": [
+    {
+      "id": "tt_2026_cse_3a",
+      "department": "CSE",
+      "year": 3,
+      "section": "A",
+      "state": "draft",
+      "createdBy": "A001",
+      "createdAt": "2026-07-01T09:00:00Z",
+      "updatedAt": "2026-07-15T11:30:00Z",
+      "approvedBy": null,
+      "approvedAt": null,
+      "publishedAt": null,
+      "entries": [
+        { "id": "entry_001", "day": "Monday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Data Structures", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-201" },
+        { "id": "entry_002", "day": "Monday", "periodStart": 4, "periodEnd": 6, "type": "lab", "subject": "DBMS Lab", "facultyId": "F1088", "facultyName": "Dr. Anitha Rao", "labCoordinatorId": "LC004", "room": "CSE-Lab-2" },
+        { "id": "entry_003", "day": "Wednesday", "periodStart": 5, "periodEnd": 5, "type": "elective", "subject": "Cloud Computing (Elective Basket B)", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-305", "basket": "B", "applicableYears": [3, 4] },
+        { "id": "entry_004", "day": "Tuesday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Operating Systems", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-201" },
+        { "id": "entry_017", "day": "Tuesday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Elective clash example (intentional dupe for conflict demo)", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-304" }
+      ]
+    },
+    {
+      "id": "tt_2026_cse_4a",
+      "department": "CSE",
+      "year": 4,
+      "section": "A",
+      "state": "pending",
+      "createdBy": "A001",
+      "createdAt": "2026-07-05T09:00:00Z",
+      "updatedAt": "2026-07-14T10:00:00Z",
+      "approvedBy": null,
+      "approvedAt": null,
+      "publishedAt": null,
+      "entries": [
+        { "id": "entry_101", "day": "Monday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Machine Learning", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-401" }
+      ]
+    },
+    {
+      "id": "tt_2026_cse_2a",
+      "department": "CSE",
+      "year": 2,
+      "section": "A",
+      "state": "published",
+      "createdBy": "A001",
+      "createdAt": "2026-06-20T09:00:00Z",
+      "updatedAt": "2026-06-28T09:00:00Z",
+      "approvedBy": "H001",
+      "approvedAt": "2026-06-27T12:00:00Z",
+      "publishedAt": "2026-06-28T09:00:00Z",
+      "entries": [
+        { "id": "entry_201", "day": "Monday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" }
+      ]
+    }
+  ],
+
+  "conflictExamples": [
+    {
+      "id": "conflict_001",
+      "type": "faculty_double_booking",
+      "severity": "blocking",
+      "message": "Dr. Ramesh Kumar is already scheduled for another class at this time.",
+      "affectedEntries": ["entry_004", "entry_017"]
+    },
+    {
+      "id": "conflict_002",
+      "type": "faculty_daily_period_limit",
+      "severity": "warning",
+      "message": "Dr. Ramesh Kumar would exceed 6 periods on Tuesday.",
+      "affectedEntries": ["entry_001"]
+    },
+    {
+      "id": "conflict_003",
+      "type": "lab_coordinator_weekly_day_limit",
+      "severity": "informational",
+      "message": "This lab coordinator is nearing the 4-day/week assignment limit.",
+      "affectedEntries": ["entry_002"]
+    }
+  ]
+}
