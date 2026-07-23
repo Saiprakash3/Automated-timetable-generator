@@ -1,16 +1,47 @@
-# Claude Code local, machine-specific settings (not shared)
+# ========== CLAUDE CODE (Local Session Config) ==========
 .claude/settings.local.json
+CLAUDE.local.md
 
-# OS / editor cruft
-Thumbs.db
-desktop.ini
-.DS_Store
-*~
-.vscode/
+# ========== PYTHON BACKEND ==========
+# Virtual environments (venv managed by Poetry)
+Backend/fastapi-backend/venv/
+Backend/fastapi-backend/.venv/
+Backend/fastapi-backend/env/
 
-# Node (in case Frontend/Backend get scaffolded later)
+# Python cache
+Backend/**/__pycache__/
+Backend/**/*.pyc
+Backend/**/*.pyo
+
+# Backend secrets & environment (NEVER commit these!)
+Backend/fastapi-backend/.env
+Backend/fastapi-backend/.env.local
+Backend/fastapi-backend/.env.test
+Backend/fastapi-backend/.env.prod
+
+# Backend testing & database
+Backend/fastapi-backend/.pytest_cache/
+Backend/fastapi-backend/.coverage
+Backend/fastapi-backend/htmlcov/
+Backend/fastapi-backend/test.db
+Backend/**/*.sqlite
+Backend/**/*.sqlite3
+
+# Backend logs
+Backend/**/*.log
+Backend/**/logs/
+
+# ========== NODE / FRONTEND ==========
 node_modules/
 dist/
 build/
 .env
 .env.local
+
+# ========== OS & EDITOR ==========
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+.vscode/
+.idea/

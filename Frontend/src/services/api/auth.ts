@@ -8,13 +8,24 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
   user: User;
+}
+
+export interface RefreshTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
 }
 
 export const authApi = {
   login: (body: LoginRequest) => api.post<LoginResponse>("/auth/login", body),
   logout: () => api.post<{ success: true }>("/auth/logout"),
-  /** Restores a session on app load — same User shape as login's `user`. */
+  refresh: (refreshToken: string) =>
+    api.post<RefreshTokenResponse>("/auth/refresh", { refresh_token: refreshToken }),
   me: () => api.get<User>("/auth/me"),
 };
