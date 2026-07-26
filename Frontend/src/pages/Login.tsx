@@ -46,8 +46,8 @@ export default function Login() {
     setSubmitting(true);
     setError(null);
     try {
-      const { token, user } = await authApi.login({ identifier: identifier.trim(), password, selectedRole: role });
-      login(user, token);
+      const { access_token, refresh_token, user } = await authApi.login({ identifier: identifier.trim(), password, selectedRole: role });
+      login(user, access_token, refresh_token);
       navigate(LANDING_ROUTE[user.role], { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
