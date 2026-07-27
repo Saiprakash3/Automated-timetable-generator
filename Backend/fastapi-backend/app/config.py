@@ -12,9 +12,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Database URLs
-    db_dev: str
-    db_test: str
-    db_prod: str
+    db_dev: str | None = None
+    db_test: str | None = None
+    db_prod: str | None = None
 
     # JWT
     jwt_secret_key: str
