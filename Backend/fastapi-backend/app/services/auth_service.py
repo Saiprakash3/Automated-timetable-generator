@@ -23,8 +23,10 @@ class AuthService:
         Raises:
             ValueError: If credentials invalid or role mismatch
         """
-        # Find user by identifier
-        user = db.query(User).filter(User.id == request.identifier).first()
+        # Find user by identifier (ID or email)
+        user = db.query(User).filter(
+            (User.id == request.identifier) | (User.email == request.identifier)
+        ).first()
 
         if not user:
             raise ValueError("INVALID_CREDENTIALS")
