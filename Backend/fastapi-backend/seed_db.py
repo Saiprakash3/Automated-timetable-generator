@@ -19,15 +19,15 @@ db = Session()
 
 try:
     # Clear existing data
-    print("🧹 Clearing existing data...")
+    print("Clearing existing data...")
     db.query(TimetableEntry).delete()
     db.query(Timetable).delete()
     db.query(User).delete()
     db.commit()
-    print("✅ Cleared all existing data")
+    print("Cleared all existing data")
 
     # Seed users
-    print("🌱 Seeding users...")
+    print("Seeding users...")
     for user_data in mock_data["users"]:
         user = User(
             id=user_data["id"],
@@ -40,10 +40,10 @@ try:
         )
         db.add(user)
     db.commit()
-    print(f"✅ Added {len(mock_data['users'])} users")
+    print(f"Added {len(mock_data['users'])} users")
 
     # Seed timetables and entries
-    print("🌱 Seeding timetables...")
+    print("Seeding timetables...")
     for tt_data in mock_data["timetables"]:
         timetable = Timetable(
             id=tt_data["id"],
@@ -82,10 +82,10 @@ try:
             db.add(entry)
 
     db.commit()
-    print(f"✅ Added {len(mock_data['timetables'])} timetables with entries")
+    print(f"Added {len(mock_data['timetables'])} timetables with entries")
 
-    print("\n✨ Database seeding complete!")
-    print("\n📋 Mock Data Summary:")
+    print("\nDatabase seeding complete!")
+    print("\nMock Data Summary:")
     print(f"  Users: {len(mock_data['users'])}")
     for user in mock_data["users"]:
         print(f"    - {user['id']}: {user['name']} ({user['role']})")
@@ -94,7 +94,7 @@ try:
         print(f"    - {tt['id']}: {tt['department']} Year {tt['year']} ({tt['state']})")
 
 except Exception as e:
-    print(f"❌ Error seeding database: {e}")
+    print(f"Error seeding database: {e}")
     db.rollback()
     sys.exit(1)
 finally:
