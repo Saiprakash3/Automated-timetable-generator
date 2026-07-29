@@ -89,12 +89,27 @@ export function generateTimetable(input: GenerateInput): Omit<GeneratedTimetable
     return sec ? `${sec.year}${sec.name}` : id;
   };
 
+  function getSortedDays(sectionId?: string) {
+    if (!sectionId) return DAYS;
+    return [...DAYS].sort((a, b) => {
+      let countA = 0;
+      let countB = 0;
+      for (let p = 1; p <= 6; p++) {
+        if (isBusy(sectionBusy, sectionId, slotKey(a, p))) countA++;
+        if (isBusy(sectionBusy, sectionId, slotKey(b, p))) countB++;
+      }
+      return countA - countB;
+    });
+  }
+
   // ---- 1. Electives — one shared day+period per basket ----
   for (const basket of baskets) {
     const period = basket.period;
     let placedDay: string | null = null;
 
-    for (const day of DAYS) {
+    const candidateDays = getSortedDays(basket.sectionIds[0]);
+
+    for (const day of candidateDays) {
       const key = slotKey(day, period);
       const facultyFree = basket.electives.every((e) => !isBusy(facultyBusy, e.facultyId, key));
       const roomFree = basket.electives.every((e) => !isBusy(roomBusy, e.roomId, key));
@@ -149,7 +164,9 @@ export function generateTimetable(input: GenerateInput): Omit<GeneratedTimetable
       const candidateLabs = relaxed ? availableLabs : sizedLabs;
       if (candidateLabs.length === 0) continue;
 
-      labSearch: for (const day of DAYS) {
+      const candidateDays = getSortedDays(row.sectionId);
+
+      labSearch: for (const day of candidateDays) {
         for (const [p1, p2] of LAB_WINDOWS) {
           const k1 = slotKey(day, p1);
           const k2 = slotKey(day, p2);
@@ -159,11 +176,6 @@ export function generateTimetable(input: GenerateInput): Omit<GeneratedTimetable
           const lab = candidateLabs.find((l) => !isBusy(roomBusy, l.id, k1) && !isBusy(roomBusy, l.id, k2));
           if (!lab) continue;
 
-          // F-07's "second person" — a Lab Coordinator assigned to this
-          // specific lab (LabCoordinator.labIds) and free for both periods.
-          // No coordinator found isn't a placement failure (conflict #15 is
-          // Informational, not Blocking — "surfaces a setup gap, not an
-          // edit error"), just an entry with no labCoordinatorId.
           const coordinator = coordinators.find(
             (c) => c.labIds.includes(lab.id) && !isBusy(coordinatorBusy, c.id, k1) && !isBusy(coordinatorBusy, c.id, k2),
           );
@@ -204,51 +216,63 @@ export function generateTimetable(input: GenerateInput): Omit<GeneratedTimetable
   }
 
   for (const row of regularRows) {
+    const subject = subjects.find((s) => s.id === row.subjectId);
     const section = sections.find((s) => s.id === row.sectionId);
+    const neededPeriods = subject?.credits ?? 1;
     const sizedRooms = rooms.filter((r) => r.capacity >= (section?.studentCount ?? 0));
 
-    let placed = false;
-    for (const relaxed of [false, true]) {
-      const candidateRooms = relaxed ? rooms : sizedRooms;
-      if (candidateRooms.length === 0) continue;
+    for (let pIdx = 0; pIdx < neededPeriods; pIdx++) {
+      let placed = false;
+      for (const relaxed of [false, true]) {
+        const candidateRooms = relaxed ? rooms : sizedRooms;
+        if (candidateRooms.length === 0) continue;
 
-      regularSearch: for (const day of DAYS) {
-        for (const period of REGULAR_PERIODS) {
-          const key = slotKey(day, period);
-          if (isBusy(facultyBusy, row.facultyId, key)) continue;
-          if (isBusy(sectionBusy, row.sectionId, key)) continue;
+        const candidateDays = getSortedDays(row.sectionId);
 
-          const room = candidateRooms.find((r) => !isBusy(roomBusy, r.id, key));
-          if (!room) continue;
+        regularSearch: for (const day of candidateDays) {
+          for (const period of REGULAR_PERIODS) {
+            const key = slotKey(day, period);
+            if (isBusy(facultyBusy, row.facultyId, key)) continue;
+            if (isBusy(sectionBusy, row.sectionId, key)) continue;
 
-          markBusy(facultyBusy, row.facultyId, key);
-          markBusy(sectionBusy, row.sectionId, key);
-          markBusy(roomBusy, room.id, key);
+            const room = candidateRooms.find((r) => !isBusy(roomBusy, r.id, key));
+            if (!room) continue;
 
-          entries.push({
-            id: `GEN-${++entryCounter}`,
-            day,
-            periodStart: period,
-            periodEnd: period,
-            type: "regular",
-            subject: subjectName(row.subjectId),
-            facultyId: row.facultyId,
-            facultyName: facultyName(row.facultyId),
-            room: room.number,
-            section: sectionLabel(row.sectionId),
-          });
+            markBusy(facultyBusy, row.facultyId, key);
+            markBusy(sectionBusy, row.sectionId, key);
+            markBusy(roomBusy, room.id, key);
 
-          if (relaxed) adjustedByRepair++;
-          placed = true;
-          break regularSearch;
+            entries.push({
+              id: `GEN-${++entryCounter}`,
+              day,
+              periodStart: period,
+              periodEnd: period,
+              type: "regular",
+              subject: subjectName(row.subjectId),
+              facultyId: row.facultyId,
+              facultyName: facultyName(row.facultyId),
+              room: room.number,
+              section: sectionLabel(row.sectionId),
+            });
+
+            if (relaxed) adjustedByRepair++;
+            placed = true;
+            break regularSearch;
+          }
         }
+        if (placed) break;
       }
-      if (placed) break;
+      if (!placed) gaps++;
     }
-    if (!placed) gaps++;
   }
 
-  const totalNeeded = mappings.length + baskets.reduce((sum, b) => sum + b.electives.length, 0);
+  const totalNeeded =
+    regularRows.reduce((sum, r) => {
+      const subj = subjects.find((s) => s.id === r.subjectId);
+      return sum + (subj?.credits ?? 1);
+    }, 0) +
+    labRows.length +
+    baskets.reduce((sum, b) => sum + b.electives.length, 0);
 
   return {
     id: `TT-${Date.now()}`,
@@ -258,3 +282,4 @@ export function generateTimetable(input: GenerateInput): Omit<GeneratedTimetable
     summary: { totalNeeded, placed: entries.length, gaps, adjustedByRepair },
   };
 }
+

@@ -5,6 +5,11 @@
     { "id": "F1023", "password": "fac123", "role": "faculty", "name": "Dr. Ramesh Kumar", "department": "CSE" },
     { "id": "F1088", "password": "fac123", "role": "faculty", "name": "Dr. Anitha Rao", "department": "CSE" },
     { "id": "F1099", "password": "fac123", "role": "faculty", "name": "Dr. Vijay Singh", "department": "CSE" },
+    { "id": "F1030", "password": "fac123", "role": "faculty", "name": "Dr. P. Verma", "department": "CSE" },
+    { "id": "F1045", "password": "fac123", "role": "faculty", "name": "Prof. N. Reddy", "department": "CSE" },
+    { "id": "F1055", "password": "fac123", "role": "faculty", "name": "Dr. K. Joshi", "department": "Electronics" },
+    { "id": "F1067", "password": "fac123", "role": "faculty", "name": "Prof. S. Mehta", "department": "Mathematics" },
+    { "id": "F1078", "password": "fac123", "role": "faculty", "name": "Dr. R. Patel", "department": "CSE" },
     { "id": "LC004", "password": "labco123", "role": "lab_coordinator", "name": "K. Srinivas", "department": "CSE" },
     { "id": "LC005", "password": "labco123", "role": "lab_coordinator", "name": "Dr. Anitha Rao", "department": "CSE", "note": "also has Faculty record F1088 - overlap case" },
     { "id": "S3021", "password": "stu123", "role": "student", "name": "P. Naveen", "department": "CSE", "year": 3, "section": "A" }
@@ -60,7 +65,32 @@
       "approvedAt": "2026-06-27T12:00:00Z",
       "publishedAt": "2026-06-28T09:00:00Z",
       "entries": [
-        { "id": "entry_201", "day": "Monday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" }
+        { "id": "entry_201", "day": "Monday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_202", "day": "Monday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Data Structures", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_203", "day": "Monday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Networks", "facultyId": "F1088", "facultyName": "Dr. Anitha Rao", "room": "CSE-101" },
+        { "id": "entry_204", "day": "Monday", "periodStart": 4, "periodEnd": 6, "type": "lab", "subject": "DBMS Lab", "facultyId": "F1088", "facultyName": "Dr. Anitha Rao", "labCoordinatorId": "LC004", "room": "CSE-Lab-2" },
+
+        { "id": "entry_205", "day": "Tuesday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Data Structures", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_206", "day": "Tuesday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Operating Systems", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_207", "day": "Tuesday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_208", "day": "Tuesday", "periodStart": 4, "periodEnd": 4, "type": "regular", "subject": "Networks", "facultyId": "F1088", "facultyName": "Dr. Anitha Rao", "room": "CSE-101" },
+        { "id": "entry_209", "day": "Tuesday", "periodStart": 5, "periodEnd": 5, "type": "regular", "subject": "DBMS", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+
+        { "id": "entry_210", "day": "Wednesday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Operating Systems", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_211", "day": "Wednesday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "DBMS", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_212", "day": "Wednesday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Data Structures", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_213", "day": "Wednesday", "periodStart": 4, "periodEnd": 6, "type": "lab", "subject": "Data Structures Lab", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "labCoordinatorId": "LC004", "room": "CSE-Lab-1" },
+
+        { "id": "entry_214", "day": "Thursday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_215", "day": "Thursday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Networks", "facultyId": "F1088", "facultyName": "Dr. Anitha Rao", "room": "CSE-101" },
+        { "id": "entry_216", "day": "Thursday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Operating Systems", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_217", "day": "Thursday", "periodStart": 4, "periodEnd": 4, "type": "regular", "subject": "DBMS", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_218", "day": "Thursday", "periodStart": 5, "periodEnd": 5, "type": "elective", "subject": "Cloud Computing (Elective Basket B)", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-305", "basket": "B", "applicableYears": [2, 3] },
+
+        { "id": "entry_219", "day": "Friday", "periodStart": 1, "periodEnd": 1, "type": "regular", "subject": "Data Structures", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_220", "day": "Friday", "periodStart": 2, "periodEnd": 2, "type": "regular", "subject": "Operating Systems", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" },
+        { "id": "entry_221", "day": "Friday", "periodStart": 3, "periodEnd": 3, "type": "regular", "subject": "Discrete Mathematics", "facultyId": "F1023", "facultyName": "Dr. Ramesh Kumar", "room": "CSE-101" },
+        { "id": "entry_222", "day": "Friday", "periodStart": 4, "periodEnd": 4, "type": "regular", "subject": "DBMS", "facultyId": "F1099", "facultyName": "Dr. Vijay Singh", "room": "CSE-101" }
       ]
     }
   ],

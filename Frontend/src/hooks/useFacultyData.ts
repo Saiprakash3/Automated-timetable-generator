@@ -19,6 +19,11 @@ let faculty: Faculty[] = [
   { id: "F-NAIR", name: "Dr. M. Nair", department: "Electronics", canServeAsLabCoordinator: true },
   { id: "F-GUPTA", name: "Dr. S. Gupta", department: "Mathematics", canServeAsLabCoordinator: false },
   { id: "F-RAO", name: "Prof. K. Rao", department: "Computer Science", canServeAsLabCoordinator: true },
+  { id: "F-VERMA", name: "Dr. P. Verma", department: "Computer Science", canServeAsLabCoordinator: true },
+  { id: "F-REDDY", name: "Prof. N. Reddy", department: "Computer Science", canServeAsLabCoordinator: false },
+  { id: "F-JOSHI", name: "Dr. K. Joshi", department: "Electronics", canServeAsLabCoordinator: true },
+  { id: "F-MEHTA", name: "Prof. S. Mehta", department: "Mathematics", canServeAsLabCoordinator: false },
+  { id: "F-PATEL", name: "Dr. R. Patel", department: "Computer Science", canServeAsLabCoordinator: false },
 ];
 const listeners = new Set<() => void>();
 
