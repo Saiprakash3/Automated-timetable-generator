@@ -183,3 +183,72 @@ class TimetableService:
             "approvedBy": tt.approved_by,
             "publishedAt": tt.published_at.isoformat() if tt.published_at else None,
         }
+
+    @staticmethod
+    def get_my_timetable(db: Session, user: User) -> dict:
+        """Get resolved schedule for current user from published timetables"""
+        # Find published timetables
+        published_tts = db.query(Timetable).filter(
+            and_(Timetable.state == "published", Timetable.deleted_at == None)
+        ).all()
+
+        if not published_tts:
+            return {
+                "user": {
+                    "id": user.id,
+                    "name": user.name,
+                    "role": user.role,
+                    "department": user.department,
+                },
+                "publishedAt": None,
+                "entries": [],
+            }
+
+        tt_ids = [tt.id for tt in published_tts]
+        latest_published_at = max((tt.published_at for tt in published_tts if tt.published_at), default=None)
+
+        # Query entries for published timetables
+        entries_query = db.query(TimetableEntry).filter(
+            and_(
+                TimetableEntry.timetable_id.in_(tt_ids),
+                TimetableEntry.deleted_at == None
+            )
+        )
+
+        # Apply role-based entry filtering
+        if user.role in ("faculty", "hod"):
+            entries_query = entries_query.filter(TimetableEntry.faculty_id == user.id)
+        elif user.role == "lab_coordinator":
+            entries_query = entries_query.filter(
+                (TimetableEntry.lab_coordinator_id == user.id) | (TimetableEntry.faculty_id == user.id)
+            )
+
+        entries = entries_query.all()
+
+        return {
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "role": user.role,
+                "department": user.department,
+            },
+            "publishedAt": latest_published_at.isoformat() if latest_published_at else None,
+            "entries": [
+                {
+                    "id": e.id,
+                    "day": e.day,
+                    "periodStart": e.period_start,
+                    "periodEnd": e.period_end,
+                    "type": e.entry_type,
+                    "subject": e.subject,
+                    "facultyId": e.faculty_id,
+                    "facultyName": e.faculty_name,
+                    "labCoordinatorId": e.lab_coordinator_id,
+                    "room": e.room,
+                    "basket": e.basket,
+                    "applicableYears": e.applicable_years,
+                }
+                for e in entries
+            ],
+        }
+

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lock, TriangleAlert, Trash2 } from "lucide-react";
 import { StatusPill } from "@/components/domain/StatusPill";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,8 @@ import { useElectiveBasketData } from "@/hooks/useElectiveBasketData";
 import { SendForApprovalDialog } from "./SendForApprovalDialog";
 import { PublishDialog } from "./PublishDialog";
 import { ReviewNote } from "@/components/domain/ReviewNote";
-import type { TimetableEntry } from "@/types";
+import { timetablesApi } from "@/services/api/timetables";
+import type { TimetableEntry, WorkflowState } from "@/types";
 
 /**
  * F-02 steps 1–7 + F-05: the "No timetable yet" trigger state, the Generate
@@ -57,6 +58,7 @@ export default function TimetableGenerate() {
   const baskets = useElectiveBasketData();
 
   const [generating, setGenerating] = useState(false);
+  const [loadingApi, setLoadingApi] = useState(true);
   const [summaryDismissed, setSummaryDismissed] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
@@ -69,6 +71,44 @@ export default function TimetableGenerate() {
   );
   const [deleteDraftId, setDeleteDraftId] = useState<string | null>(null);
 
+  useEffect(() => {
+    let isMounted = true;
+    timetablesApi
+      .list()
+      .then(async (res) => {
+        if (isMounted && res.timetables && res.timetables.length > 0) {
+          // Get details of the first timetable found (or active one)
+          const detail = await timetablesApi.get(res.timetables[0].id);
+          if (isMounted && detail) {
+            setGeneratedTimetable({
+              id: detail.id,
+              status: (detail.state || "draft") as WorkflowState,
+              generatedAt: detail.createdAt,
+              summary: {
+                totalNeeded: detail.entries.length,
+                placed: detail.entries.length,
+                gaps: 0,
+                adjustedByRepair: 0,
+              },
+              entries: detail.entries as unknown as TimetableEntry[],
+              approvedBy: detail.approvedBy || undefined,
+              publishedAt: detail.publishedAt || undefined,
+            });
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load timetables from backend API:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingApi(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function handleGenerate() {
     setGenerating(true);
     // Brief artificial delay so the loading state is visible — the
@@ -79,6 +119,10 @@ export default function TimetableGenerate() {
       setSummaryDismissed(false);
       setGenerating(false);
     }, 600);
+  }
+
+  if (loadingApi) {
+    return <div className="mx-auto max-w-2xl py-16 text-center text-muted-foreground">Loading timetable...</div>;
   }
 
   if (!timetable) {

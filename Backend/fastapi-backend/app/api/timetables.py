@@ -50,7 +50,17 @@ async def list_timetables(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.get("/me")
+async def get_my_timetable(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user's resolved published schedule"""
+    return TimetableService.get_my_timetable(db, current_user)
+
+
 @router.get("/{timetable_id}")
+
 async def get_timetable(
     timetable_id: str,
     db: Session = Depends(get_db),

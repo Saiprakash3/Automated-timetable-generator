@@ -1,6 +1,7 @@
 # ========== CLAUDE CODE (Local Session Config) ==========
 .claude/settings.local.json
 CLAUDE.local.md
+.agent/
 
 # ========== PYTHON BACKEND ==========
 # Virtual environments (venv managed by Poetry)

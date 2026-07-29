@@ -1,19 +1,40 @@
+import { useState, useEffect } from "react";
 import { Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTimetableData } from "@/hooks/useTimetableData";
+import { timetablesApi } from "@/services/api/timetables";
+import type { TimetableMeta } from "@/types";
 
-/**
- * F-04 step 2: "a queue of one is expected" — the combined-timetable model
- * means this list only ever shows 0 or 1 item, but stays list-shaped in
- * case that ever changes. Empty state is PATTERNS.md §5.1's
- * Waiting-for-others sub-pattern (clock icon, no CTA — "a waiting state has
- * nothing for the user to do"), not the Zero-state pattern every setup page
- * uses, since there's genuinely no action HOD can take to make something
- * appear here.
- */
+
 export default function HodApprovals() {
   const timetable = useTimetableData();
-  const pending = timetable?.status === "pending" ? timetable : null;
+  const mockPending = timetable?.status === "pending" ? timetable : null;
+
+  const [apiPending, setApiPending] = useState<TimetableMeta | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    timetablesApi
+      .list({ state: "pending" })
+      .then((res) => {
+        if (isMounted && res.timetables && res.timetables.length > 0) {
+          setApiPending(res.timetables[0]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch pending approvals from backend API:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const pendingItem = apiPending ? { id: apiPending.id, submittedAt: apiPending.createdAt } : mockPending;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -22,7 +43,11 @@ export default function HodApprovals() {
         <p className="font-body text-muted-foreground">Timetables waiting for your review.</p>
       </div>
 
-      {!pending ? (
+      {loading ? (
+        <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
+          <p className="font-body text-sm text-muted-foreground">Loading pending approvals...</p>
+        </div>
+      ) : !pendingItem ? (
         <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
           <Clock className="size-10 text-muted-foreground" aria-hidden="true" />
           <div className="space-y-1">
@@ -34,13 +59,13 @@ export default function HodApprovals() {
         </div>
       ) : (
         <Link
-          to={`/approvals/${pending.id}`}
+          to={`/approvals/${pendingItem.id}`}
           className="flex items-center justify-between gap-4 rounded-lg border border-border px-6 py-4 hover:bg-muted"
         >
           <div>
             <p className="font-heading text-h3 font-medium text-foreground">Timetable</p>
             <p className="font-body text-sm text-muted-foreground">
-              Submitted {new Date(pending.submittedAt ?? pending.generatedAt).toLocaleString()}
+              Submitted {new Date(pendingItem.submittedAt ?? Date.now()).toLocaleString()}
             </p>
           </div>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -49,3 +74,4 @@ export default function HodApprovals() {
     </div>
   );
 }
+

@@ -1,9 +1,12 @@
+import { useState, useEffect } from "react";
 import { FileText, Calendar } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { useTimetableData } from "@/hooks/useTimetableData";
 import { useFacultyData } from "@/hooks/useFacultyData";
 import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
 import { resolveMyEntries } from "@/lib/resolveMyEntries";
+import { timetablesApi } from "@/services/api/timetables";
+import type { TimetableEntry } from "@/types";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
@@ -11,30 +14,51 @@ function periodLabel(periodStart: number, periodEnd: number) {
   return periodStart === periodEnd ? `Period ${periodStart}` : `Period ${periodStart}–${periodEnd}`;
 }
 
-/**
- * F-08 — the primary view for Faculty, Student, Lab Coordinator, and
- * HOD-as-teacher. Mobile-first vertical day-list (DOMAIN_COMPONENTS.md §5's
- * "Mobile adaptation": each day a section header, sessions as cards
- * underneath, chronologically) — the desktop wide-grid variant
- * (INTERACTION_DECISIONS.md §10.2) isn't built; this list also works fine
- * at desktop widths, just narrower than a full grid would be.
- *
- * Card content is role-specific, matching what each role actually needs to
- * know (DOMAIN_COMPONENTS.md §10.4's own reasoning): Faculty/HOD see the
- * section they're teaching (the faculty name is always the viewer, so
- * showing it back would be noise); Lab Coordinator sees which teaching
- * Faculty they're paired with, since the coordinator is the second person,
- * not the teacher; Student sees the faculty teaching them.
- */
 export default function MyTimetable() {
   const { user } = useSession();
-  const timetable = useTimetableData();
+  const mockTimetable = useTimetableData();
   const faculty = useFacultyData();
   const coordinators = useLabCoordinatorData();
 
+  const [apiEntries, setApiEntries] = useState<TimetableEntry[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    timetablesApi
+      .me()
+      .then((res) => {
+        if (isMounted && res && res.entries) {
+          setApiEntries(res.entries as unknown as TimetableEntry[]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch schedule from backend API:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   if (!user) return null;
 
-  if (!timetable || timetable.status !== "published") {
+  const entriesToDisplay = apiEntries !== null 
+    ? apiEntries 
+    : (mockTimetable?.status === "published" ? resolveMyEntries(user, mockTimetable.entries, faculty, coordinators) : []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
+        <p className="font-body text-sm text-muted-foreground">Loading schedule...</p>
+      </div>
+    );
+  }
+
+  if (entriesToDisplay.length === 0) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
         <FileText className="size-10 text-muted-foreground" aria-hidden="true" />
@@ -48,7 +72,8 @@ export default function MyTimetable() {
     );
   }
 
-  const myEntries = resolveMyEntries(user, timetable.entries, faculty, coordinators);
+  const myEntries = entriesToDisplay;
+
 
   if (myEntries.length === 0) {
     return (
