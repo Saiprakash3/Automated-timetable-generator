@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -81,7 +82,17 @@ export function CellEditDrawer({
   const isLab = entry?.type === "lab";
   const readOnly = isElective;
 
-  const regularSubjects = useMemo(() => subjects.filter((s) => s.type === "regular"), [subjects]);
+  const sectionYear = parseInt(sectionLabel.charAt(0), 10);
+
+  const regularSubjects = useMemo(() => {
+    return subjects.filter((s) => {
+      if (s.type !== "regular") return false;
+      if (!isNaN(sectionYear)) {
+        return s.code.startsWith(`CS${sectionYear}`);
+      }
+      return true;
+    });
+  }, [subjects, sectionYear]);
   const roomOptions = isLab ? labs.filter((l) => l.available).map((l) => l.room) : rooms.map((r) => r.number);
 
   /** Union of the dedicated Lab Coordinator pool and Faculty who can also
@@ -201,11 +212,24 @@ export function CellEditDrawer({
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regularSubjects.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </SelectItem>
-                  ))}
+                  {regularSubjects.map((s) => {
+                    const currentCount = allEntries.filter(
+                      (e) => e.section === sectionLabel && e.subject === s.name && e.id !== entry?.id,
+                    ).length;
+                    const maxCredits = s.credits;
+                    const isLimitReached = currentCount >= maxCredits;
+
+                    return (
+                      <SelectItem key={s.id} value={s.id} disabled={isLimitReached}>
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <span>{s.name} ({s.code})</span>
+                          <span className={cn("text-xs px-1.5 py-0.5 rounded", isLimitReached ? "bg-amber-100 text-amber-800 font-semibold" : "text-muted-foreground")}>
+                            {currentCount}/{maxCredits} cr{isLimitReached ? " · Limit reached" : ""}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}

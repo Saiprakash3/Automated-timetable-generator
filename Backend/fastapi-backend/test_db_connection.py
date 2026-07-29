@@ -4,7 +4,7 @@ import os
 from sqlalchemy import create_engine, text
 from app.config import settings
 
-def test_database_connection(db_name: str, connection_string: str, env: str = "development") -> bool:
+def check_database_connection(db_name: str, connection_string: str, env: str = "development") -> bool:
     """Test a single database connection"""
     print(f"\n{'='*60}")
     print(f"Testing {db_name.upper()} Database")
@@ -63,13 +63,13 @@ def main():
     results = {}
 
     # Test dev database
-    results['dev'] = test_database_connection('dev', settings.db_dev, 'development')
+    results['dev'] = check_database_connection('dev', settings.db_dev, 'development')
 
     # Test test database
-    results['test'] = test_database_connection('test', settings.db_test, 'test')
+    results['test'] = check_database_connection('test', settings.db_test, 'test')
 
     # Test prod database
-    results['prod'] = test_database_connection('prod', settings.db_prod, 'production')
+    results['prod'] = check_database_connection('prod', settings.db_prod, 'production')
 
     # Summary
     print(f"\n{'='*60}")
