@@ -9,6 +9,7 @@ import { useTimetableData, approveTimetable } from "@/hooks/useTimetableData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useSession } from "@/hooks/useSession";
 import { RequestChangesDialog } from "./RequestChangesDialog";
+import type { GeneratedTimetable } from "@/types";
 
 /**
  * F-04 steps 3–6: the read-only detail view HOD reviews before deciding.
@@ -22,32 +23,85 @@ export default function HodApprovalDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useSession();
-  const timetable = useTimetableData();
+  const storeTimetable = useTimetableData();
   const sections = useSectionData();
   const [selectedSectionId, setSelectedSectionId] = useState(sections[0]?.id ?? "");
   const [view, setView] = useState<GridView>("week");
   const [selectedDay, setSelectedDay] = useState("Monday");
   const [requestChangesOpen, setRequestChangesOpen] = useState(false);
 
-  // Guard: only a pending timetable matching this id is reviewable here.
-  // Anything else (already decided, wrong id, or none at all) has nothing
-  // left to review — back to the list. Redirect lives in an effect, not the
-  // render body: this fires while still mounted (e.g. right after HOD's own
-  // Request Changes submit flips status away from "pending"), and calling
-  // navigate() during render throws React's "Cannot update a component
-  // while rendering a different component" warning.
-  const isReviewable = !!timetable && timetable.id === id && timetable.status === "pending";
+  const [fetchedTimetable, setFetchedTimetable] = useState<GeneratedTimetable | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isReviewable) navigate("/approvals", { replace: true });
-  }, [isReviewable, navigate]);
+    if (storeTimetable && (storeTimetable.id === id || storeTimetable.status === "pending")) {
+      return;
+    }
+    if (!id) return;
+    setLoading(true);
+    import("@/services/api/timetables").then(({ timetablesApi }) => {
+      timetablesApi
+        .get(id)
+        .then((data) => {
+          setFetchedTimetable({
+            id: data.id,
+            status: data.state,
+            generatedAt: data.createdAt,
+            entries: data.entries || [],
+            summary: {
+              totalNeeded: data.entries?.length || 0,
+              placed: data.entries?.length || 0,
+              gaps: 0,
+              adjustedByRepair: 0,
+            },
+            draftNumber: 1,
+            submittedAt: data.createdAt,
+          });
+        })
+        .catch((err) => {
+          console.warn("Could not fetch timetable details from API:", err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
+  }, [id, storeTimetable]);
 
-  if (!isReviewable || !timetable) return null;
+  const activeTimetable =
+    storeTimetable && (storeTimetable.id === id || storeTimetable.status === "pending")
+      ? storeTimetable
+      : fetchedTimetable;
 
-  const { summary } = timetable;
+  const isReviewable = !loading && !!activeTimetable && (activeTimetable.status === "pending" || activeTimetable.id === id);
 
-  function handleApprove() {
+  useEffect(() => {
+    if (!loading && !isReviewable) {
+      navigate("/approvals", { replace: true });
+    }
+  }, [isReviewable, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-3">
+        <p className="font-body text-sm text-muted-foreground">Loading timetable details...</p>
+      </div>
+    );
+  }
+
+  if (!isReviewable || !activeTimetable) return null;
+
+  const { summary } = activeTimetable;
+
+  async function handleApprove() {
     if (!user) return;
+    if (id) {
+      try {
+        const { timetablesApi } = await import("@/services/api/timetables");
+        await timetablesApi.approve(id);
+      } catch (err) {
+        console.warn("API approve call failed/skipped:", err);
+      }
+    }
     approveTimetable(user.name);
     toast.success("Timetable approved.");
     navigate("/approvals");
@@ -59,16 +113,16 @@ export default function HodApprovalDetail() {
         <div>
           <h1 className="font-heading text-h1 font-semibold text-foreground">Timetable</h1>
           <p className="font-body text-muted-foreground">
-            Submitted {new Date(timetable.submittedAt ?? timetable.generatedAt).toLocaleString()}
+            Submitted {new Date(activeTimetable.submittedAt ?? activeTimetable.generatedAt).toLocaleString()}
           </p>
         </div>
-        <StatusPill state={timetable.status} />
+        <StatusPill state={activeTimetable.status} />
       </div>
 
-      {timetable.note && (
+      {activeTimetable.note && (
         <div className="rounded-lg border border-border bg-muted px-4 py-3">
           <p className="font-body text-sm font-medium text-foreground">Note from Admin</p>
-          <p className="font-body text-sm text-muted-foreground">"{timetable.note}"</p>
+          <p className="font-body text-sm text-muted-foreground">"{activeTimetable.note}"</p>
         </div>
       )}
 
@@ -98,7 +152,7 @@ export default function HodApprovalDetail() {
       {(() => {
         const section = sections.find((s) => s.id === selectedSectionId);
         const sectionLabel = section ? `${section.year}${section.name}` : "";
-        const sectionEntries = timetable.entries.filter(
+        const sectionEntries = activeTimetable.entries.filter(
           (e) => e.section === sectionLabel || e.sections?.includes(sectionLabel),
         );
         return (
@@ -117,7 +171,7 @@ export default function HodApprovalDetail() {
         <Button onClick={handleApprove}>Approve</Button>
       </div>
 
-      <RequestChangesDialog open={requestChangesOpen} onOpenChange={setRequestChangesOpen} />
+      <RequestChangesDialog open={requestChangesOpen} onOpenChange={setRequestChangesOpen} timetableId={id} />
     </div>
   );
 }

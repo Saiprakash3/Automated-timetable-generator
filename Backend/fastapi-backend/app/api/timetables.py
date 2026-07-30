@@ -13,7 +13,19 @@ from app.services.workflow_service import WorkflowService
 from app.api.dependencies import get_current_user, get_current_admin, get_current_hod
 from app.models import User
 
+from app.services.generation_service import TimetableGeneratorService
+
 router = APIRouter(prefix="/api/timetables", tags=["timetables"])
+
+
+@router.post("/generate")
+async def generate_timetable(
+    department: str = Query("CSE"),
+    year: int = Query(3),
+    section: str = Query("A"),
+):
+    """Generate a timetable using backend constraint solver"""
+    return TimetableGeneratorService.generate(department=department, year=year, section=section)
 
 
 @router.get("")

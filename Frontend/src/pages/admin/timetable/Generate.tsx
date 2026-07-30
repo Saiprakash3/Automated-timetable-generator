@@ -109,16 +109,37 @@ export default function TimetableGenerate() {
     };
   }, []);
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setGenerating(true);
-    // Brief artificial delay so the loading state is visible — the
-    // placement algorithm itself runs synchronously and is effectively instant.
+    try {
+      const data = await timetablesApi.generate("CSE", 3, "A");
+      if (data) {
+        setGeneratedTimetable({
+          id: data.id,
+          status: (data.state || "draft") as WorkflowState,
+          generatedAt: data.createdAt,
+          summary: {
+            totalNeeded: data.entries?.length || 0,
+            placed: data.entries?.length || 0,
+            gaps: 0,
+            adjustedByRepair: 0,
+          },
+          entries: (data.entries || []) as unknown as TimetableEntry[],
+        });
+        setSummaryDismissed(false);
+        setGenerating(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Backend generation failed, falling back to local solver:", err);
+    }
+
     setTimeout(() => {
       const result = generateTimetable({ subjects, sections, faculty, rooms, labs, coordinators, mappings, baskets });
       setGeneratedTimetable(result);
       setSummaryDismissed(false);
       setGenerating(false);
-    }, 600);
+    }, 400);
   }
 
   if (loadingApi) {

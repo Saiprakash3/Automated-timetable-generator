@@ -1,16 +1,20 @@
 """Pytest configuration and shared fixtures"""
 import os
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import sessionmaker
 
-# Set test database URL before importing app
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["APP_ENV"] = "test"
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
+from app.config import settings
+settings.app_env = "test"
+settings.db_test = "sqlite:///:memory:"
+
+import app.models
 from app.main import app
 from app.database import get_db, engine
 from app.models.base import Base
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
 
 # Create session factory using app's test engine
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

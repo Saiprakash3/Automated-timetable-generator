@@ -1,6 +1,6 @@
 """Application configuration using Pydantic Settings"""
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     db_prod: str | None = None
 
     # JWT
-    jwt_secret_key: str
+    jwt_secret_key: str = "supersecretkey123456789"
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 8
 
@@ -64,9 +64,7 @@ class Settings(BaseSettings):
 
         return db_url
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
 settings = Settings()

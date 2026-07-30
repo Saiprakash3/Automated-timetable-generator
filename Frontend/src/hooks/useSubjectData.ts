@@ -1,13 +1,7 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useEffect } from "react";
 import type { Subject } from "@/types";
+import { setupApi } from "@/services/api/setup";
 
-/**
- * Same placeholder pattern as useFacultyData.ts — no setup-data endpoints
- * exist yet. Sample data matches subject names/codes already used
- * throughout this project's Figma prototype (the published III-CSE-A grid
- * and the HOD's teaching schedule) rather than inventing new ones, and
- * `defaultFacultyId` references the real ids from useFacultyData.ts.
- */
 let subjects: Subject[] = [
   // --- 1st Year Subjects (CS1xx) ---
   { id: "S-CS101", name: "Programming & Problem Solving", code: "CS101", credits: 4, type: "regular", defaultFacultyId: "F-SHARMA" },
@@ -43,19 +37,46 @@ let subjects: Subject[] = [
   { id: "S-CS405", name: "Compiler & Cloud Lab", code: "CS405", credits: 1, type: "lab", defaultFacultyId: "F-VERMA" },
 ];
 const listeners = new Set<() => void>();
+let initialized = false;
 
 function notify() {
   for (const listener of listeners) listener();
+}
+
+function loadSubjectsFromApi() {
+  if (initialized) return;
+  initialized = true;
+  setupApi
+    .getSubjects()
+    .then((data) => {
+      if (data && data.length > 0) {
+        subjects = data;
+        notify();
+      }
+    })
+    .catch(() => {});
 }
 
 export function addSubject(record: Omit<Subject, "id">) {
   const newRecord: Subject = { ...record, id: `S-${Date.now()}` };
   subjects = [...subjects, newRecord];
   notify();
+  setupApi.createSubject({
+    id: newRecord.id,
+    code: newRecord.code,
+    name: newRecord.name,
+    department: "Computer Science",
+    weekly_lectures: newRecord.credits,
+    requires_lab: newRecord.type === "lab",
+  }).catch(() => {});
   return newRecord;
 }
 
 export function useSubjectData() {
+  useEffect(() => {
+    loadSubjectsFromApi();
+  }, []);
+
   return useSyncExternalStore(
     (callback) => {
       listeners.add(callback);
