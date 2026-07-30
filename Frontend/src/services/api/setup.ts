@@ -8,15 +8,35 @@ export interface SubjectFacultyMapping {
   section_id: string;
 }
 
+export interface CreateSubjectPayload {
+  id?: string;
+  code: string;
+  name: string;
+  department?: string;
+  year?: number;
+  weekly_lectures?: number;
+  requires_lab?: boolean;
+  credits?: number;
+  type?: string;
+  defaultFacultyId?: string;
+}
+
+export interface CreateFacultyPayload {
+  id?: string;
+  name: string;
+  department?: string;
+  can_serve_as_lab_coordinator?: boolean;
+}
+
 export const setupApi = {
   // Faculty
   getFaculty: () => api.get<Faculty[]>("/setup/faculty"),
-  createFaculty: (body: Omit<Faculty, "id"> & { id?: string }) => api.post<Faculty>("/setup/faculty", body),
+  createFaculty: (body: CreateFacultyPayload) => api.post<Faculty>("/setup/faculty", body),
   deleteFaculty: (id: string) => api.post<void>(`/setup/faculty/${id}`),
 
   // Subjects
   getSubjects: () => api.get<Subject[]>("/setup/subjects"),
-  createSubject: (body: Omit<Subject, "id"> & { id?: string }) => api.post<Subject>("/setup/subjects", body),
+  createSubject: (body: CreateSubjectPayload) => api.post<Subject>("/setup/subjects", body),
 
   // Rooms
   getRooms: () => api.get<Room[]>("/setup/rooms"),
