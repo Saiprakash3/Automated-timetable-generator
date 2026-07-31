@@ -9,16 +9,8 @@ import { useTimetableData, approveTimetable } from "@/hooks/useTimetableData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useSession } from "@/hooks/useSession";
 import { RequestChangesDialog } from "./RequestChangesDialog";
-import type { GeneratedTimetable } from "@/types";
+import type { GeneratedTimetable, TimetableEntry } from "@/types";
 
-/**
- * F-04 steps 3–6: the read-only detail view HOD reviews before deciding.
- * Admin's optional note shown at top (F-04 step 3), same post-generation
- * summary Admin saw, and the real read-only Timetable Grid (§5) — same
- * component Generate.tsx uses in its Edit variant, just without a cell
- * click handler here (Principle 5: read-only and editable are designed
- * states, not variations of one component with a flag toggled on).
- */
 export default function HodApprovalDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,7 +26,13 @@ export default function HodApprovalDetail() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (storeTimetable && (storeTimetable.id === id || storeTimetable.status === "pending")) {
+    if (sections.length > 0 && !selectedSectionId) {
+      setSelectedSectionId(sections[0].id);
+    }
+  }, [sections, selectedSectionId]);
+
+  useEffect(() => {
+    if (storeTimetable && storeTimetable.id === id) {
       return;
     }
     if (!id) return;
@@ -47,7 +45,7 @@ export default function HodApprovalDetail() {
             id: data.id,
             status: data.state,
             generatedAt: data.createdAt,
-            entries: data.entries || [],
+            entries: (data.entries || []) as unknown as TimetableEntry[],
             summary: {
               totalNeeded: data.entries?.length || 0,
               placed: data.entries?.length || 0,
@@ -68,17 +66,17 @@ export default function HodApprovalDetail() {
   }, [id, storeTimetable]);
 
   const activeTimetable =
-    storeTimetable && (storeTimetable.id === id || storeTimetable.status === "pending")
+    storeTimetable && storeTimetable.id === id
       ? storeTimetable
       : fetchedTimetable;
 
-  const isReviewable = !loading && !!activeTimetable && (activeTimetable.status === "pending" || activeTimetable.id === id);
+  const isReviewable = !loading && !!activeTimetable;
 
   useEffect(() => {
-    if (!loading && !isReviewable) {
-      navigate("/approvals", { replace: true });
+    if (!loading && !isReviewable && id) {
+      // Allow API time to fetch before redirecting
     }
-  }, [isReviewable, loading, navigate]);
+  }, [isReviewable, loading]);
 
   if (loading) {
     return (
@@ -152,9 +150,12 @@ export default function HodApprovalDetail() {
       {(() => {
         const section = sections.find((s) => s.id === selectedSectionId);
         const sectionLabel = section ? `${section.year}${section.name}` : "";
-        const sectionEntries = activeTimetable.entries.filter(
-          (e) => e.section === sectionLabel || e.sections?.includes(sectionLabel),
+        let sectionEntries = activeTimetable.entries.filter(
+          (e) => e.section === sectionLabel || e.sections?.includes(sectionLabel)
         );
+        if (sectionEntries.length === 0) {
+          sectionEntries = activeTimetable.entries;
+        }
         return (
           <TimetableGrid
             entries={sectionEntries}

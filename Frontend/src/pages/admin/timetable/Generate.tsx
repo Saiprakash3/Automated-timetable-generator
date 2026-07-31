@@ -269,9 +269,12 @@ export default function TimetableGenerate() {
       {(() => {
         const section = sections.find((s) => s.id === selectedSectionId);
         const sectionLabel = section ? `${section.year}${section.name}` : "";
-        const sectionEntries = timetable.entries.filter(
+        let sectionEntries = timetable.entries.filter(
           (e) => e.section === sectionLabel || e.sections?.includes(sectionLabel),
         );
+        if (sectionEntries.length === 0) {
+          sectionEntries = timetable.entries;
+        }
         return (
           <TimetableGrid
             entries={sectionEntries}
