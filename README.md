@@ -450,7 +450,7 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ## 👥 Team
 
-Developed by Prakash with focus on:
+Developed by Bhanu Prasad,Prakash with focus on:
 - Automated scheduling and conflict resolution
 - Robust authentication and authorization
 - Comprehensive testing and documentation
