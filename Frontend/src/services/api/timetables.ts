@@ -47,6 +47,8 @@ interface PublishResponse {
 export const timetablesApi = {
   list: (params: TimetableListParams = {}) => api.get<{ timetables: TimetableMeta[] }>(`/timetables${toQuery(params)}`),
   get: (id: string) => api.get<Timetable>(`/timetables/${id}`),
+  generate: (department = "CSE", year = 3, section = "A") =>
+    api.post<Timetable>(`/timetables/generate?department=${department}&year=${year}&section=${section}`),
   /** Resolved read-only schedule for the logged-in user (Faculty/Student/Lab Coordinator/HOD-on-mobile). */
   me: () => api.get<MyTimetable>("/timetables/me"),
   /** Admin only. Creates a new draft timetable, entries: []. */

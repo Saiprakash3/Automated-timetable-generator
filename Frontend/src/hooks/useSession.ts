@@ -14,11 +14,12 @@ import type { User } from "@/types";
 
 interface Session {
   user: User | null;
-  token: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
 }
 
 const STORAGE_KEY = "session";
-const EMPTY_SESSION: Session = { user: null, token: null };
+const EMPTY_SESSION: Session = { user: null, access_token: null, refresh_token: null };
 
 function readStoredSession(): Session {
   try {
@@ -36,8 +37,8 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-export function login(user: User, token: string) {
-  session = { user, token };
+export function login(user: User, access_token: string, refresh_token: string) {
+  session = { user, access_token, refresh_token };
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   notify();
 }
@@ -51,7 +52,12 @@ export function logout() {
 
 /** Non-reactive read for use outside components (e.g. services/api/client.ts, which can't call hooks). */
 export function getToken() {
-  return session.token;
+  return session.access_token;
+}
+
+/** Get refresh token for token refresh flow */
+export function getRefreshToken() {
+  return session.refresh_token;
 }
 
 export function useSession() {

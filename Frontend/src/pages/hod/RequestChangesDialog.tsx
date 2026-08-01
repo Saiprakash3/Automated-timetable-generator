@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/useSession";
 interface RequestChangesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  timetableId?: string;
 }
 
 /**
@@ -19,7 +20,7 @@ interface RequestChangesDialogProps {
  * error-recovery note. Labeled "Request changes" throughout (not "Reject")
  * — collaborative framing, same underlying Pending → Draft transition.
  */
-export function RequestChangesDialog({ open, onOpenChange }: RequestChangesDialogProps) {
+export function RequestChangesDialog({ open, onOpenChange, timetableId }: RequestChangesDialogProps) {
   const { user } = useSession();
   const navigate = useNavigate();
   const [reason, setReason] = useState("");
@@ -30,9 +31,19 @@ export function RequestChangesDialog({ open, onOpenChange }: RequestChangesDialo
 
   const isValid = reason.trim() !== "";
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid || !user) return;
+
+    if (timetableId) {
+      try {
+        const { timetablesApi } = await import("@/services/api/timetables");
+        await timetablesApi.requestChanges(timetableId, { reason });
+      } catch (err) {
+        console.warn("API requestChanges call failed/skipped:", err);
+      }
+    }
+
     requestTimetableChanges(reason, user.name);
     reset();
     onOpenChange(false);

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { FileText, Calendar } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { useTimetableData } from "@/hooks/useTimetableData";
@@ -5,6 +6,7 @@ import { useFacultyData } from "@/hooks/useFacultyData";
 import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
 import { resolveMyEntries } from "@/lib/resolveMyEntries";
 import { TimetableGrid } from "@/components/domain/TimetableGrid";
+import { timetablesApi } from "@/services/api/timetables";
 import type { TimetableEntry, User } from "@/types";
 
 /**
@@ -36,16 +38,56 @@ function detailFor(user: User) {
  * Cells the viewer isn't scheduled for correctly read "Free", exactly as the
  * design's 5-sessions/25-Free HOD screen does — a personal schedule is the
  * whole week with your own sessions in it, not just a list of what you teach.
+ *
+ * Entries come from the real backend (`timetablesApi.me()`) when it answers;
+ * `apiEntries === null` (request still in flight, or the API errored) falls
+ * back to resolving the mock timetable store instead of showing nothing.
  */
 export default function MyTimetable() {
   const { user } = useSession();
-  const timetable = useTimetableData();
+  const mockTimetable = useTimetableData();
   const faculty = useFacultyData();
   const coordinators = useLabCoordinatorData();
 
+  const [apiEntries, setApiEntries] = useState<TimetableEntry[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    timetablesApi
+      .me()
+      .then((res) => {
+        if (isMounted && res && res.entries) {
+          setApiEntries(res.entries as unknown as TimetableEntry[]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch schedule from backend API:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   if (!user) return null;
 
-  if (!timetable || timetable.status !== "published") {
+  const entriesToDisplay = apiEntries !== null 
+    ? apiEntries 
+    : (mockTimetable?.status === "published" ? resolveMyEntries(user, mockTimetable.entries, faculty, coordinators) : []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
+        <p className="font-body text-sm text-muted-foreground">Loading schedule...</p>
+      </div>
+    );
+  }
+
+  if (entriesToDisplay.length === 0) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-border text-center">
         <FileText className="size-10 text-muted-foreground" aria-hidden="true" />
@@ -59,7 +101,8 @@ export default function MyTimetable() {
     );
   }
 
-  const myEntries = resolveMyEntries(user, timetable.entries, faculty, coordinators);
+  const myEntries = entriesToDisplay;
+
 
   if (myEntries.length === 0) {
     return (
