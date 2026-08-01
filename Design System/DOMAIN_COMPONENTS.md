@@ -36,6 +36,18 @@ Every component here references generic components from `COMPONENTS.md` where re
 
 **States:** default, hover (only when clickable — some pills link somewhere, e.g., Pending Approval → preview of what was sent).
 
+> ✅ **Clickable destination pinned down 2026-08-01.** This spec left "some pills link somewhere" open. As built, the pill links to exactly one place: **draft history** (the Timetable screen's "Manage drafts" panel, `PATTERNS.md` §8.3). It becomes interactive *only* when there is history to open — archived drafts exist AND the timetable isn't mid-review (Pending/Approved), which is the same condition that governs whether the panel renders at all, so the two can't disagree.
+>
+> **The element type follows the behaviour**, deliberately: with no destination the pill renders as a plain `<span>`, not a disabled-looking button. A pill that looks clickable and does nothing is the exact dead-click this resolved — it was reported as a bug ("I can't click the draft button") precisely because a status badge read as an affordance.
+>
+> The Pending-Approval → preview link suggested above is **not built** — there is no separate "what was sent" preview screen; the Approval Detail view already serves that purpose for HOD.
+>
+> **In Figma (`90:57`), 2026-08-01:** the variant set gained an `Interactive` boolean, taking it to **20 variants** (5 States × 2 Sizes × 2 Interactive). `Interactive=true` underlines the label — the same delta as the code's `hover:underline`. The matrix is deliberately **complete rather than scoped to the states that can actually be clickable** (realistically only Draft and Published, and only at `default` size): an incomplete variant set trips Figma's "missing combinations" warning and makes the component awkward to pick from, and a filled cell costs nothing but documents the treatment if the interactive rule ever widens.
+>
+> **The hover underline is scoped to the label, not the pill.** On Published it would otherwise swallow the timestamp too — underlining the whole "Published — Mar 15, 2:30 PM" string reads as a rule struck through the pill rather than as an affordance on the thing you click through to. `StatusPill.tsx` therefore wraps the label in its own `<span>` and puts `group-hover/pill:underline` on that span, leaving the ` — {timestamp}` suffix as a sibling text node outside it. Verified in the browser under real hover: the button and the wrapper both compute `text-decoration-line: none`, only the 79px label box underlines, and the 146px timestamp does not. The group is **named** (`group/pill`) so an ancestor's unnamed `group` can never trigger it.
+>
+> ⚠️ **Figma `90:57` still diverges here.** Its `Interactive=true` Published variants underline the full string, because the underline was applied with `findAllWithCriteria({types:['TEXT']})` across every text node in the variant. Figma should follow the code: underline the label text node only.
+
 **Anatomy:** icon (left, 16px) + label + timestamp suffix (only for Published — "Published — Mar 15, 2:30 PM").
 
 **Tokens consumed:**
@@ -182,11 +194,11 @@ Periods are **60 minutes**. There is no mid-morning break.
 
 *Evidence: Category A — confirmed by Prakash (2026-07-16). Day-vs-period model confirmed 2026-07-16.*
 
-**Sizes:** Desktop (≥1024px), Tablet (768–1023px), Mobile (<768px — becomes a vertical day list rather than grid, per Principle 7).
+**Sizes:** Desktop (≥1024px), Tablet (768–1023px), Mobile (<768px — ~~becomes a vertical day list rather than grid, per Principle 7~~ **keeps the grid and scrolls horizontally; see Mobile adaptation below, revised 2026-08-01**).
 
 **Variants:**
 - Full-week view (default on desktop)
-- Single-day view (default on mobile, toggle-available on desktop via View Controls)
+- Single-day view (toggle-available via View Controls; **no longer the mobile default** as of 2026-08-01 — mobile shows the full week and scrolls)
 - Print/export view (separate stripped-down variant)
 
 **Anatomy:**
@@ -206,9 +218,16 @@ Periods are **60 minutes**. There is no mid-morning break.
 - Cell radius: `--radius-none` (per `FOUNDATIONS.md` §3.2 — grid cells stay sharp)
 
 **Mobile adaptation:**
-- Below 768px, grid becomes a vertical list: each day is a section header, sessions listed as cards underneath, chronologically.
-- Card-per-session shows: time, subject, faculty, room, and lab-coordinator (if lab).
-- Sticky day-section headers as the user scrolls.
+
+> 🔄 **Superseded 2026-08-01 (Prakash).** Mobile now renders **the same day×period grid as desktop**, scrolling horizontally when it doesn't fit, rather than reflowing into a vertical day-list. The day column is pinned (`sticky left-0`) so the row stays identifiable while scrolling sideways, and the column headers compress to start times only (`9:00`) since the period *number* carries no meaning for a read-only viewer.
+>
+> **Why the reversal:** the day-list and the grid had drifted into two different mental models of the same data — a phone user and a desktop user reading "their timetable" were looking at genuinely different artifacts, and only the grid shows the shape of a week (gaps, back-to-back blocks, free afternoons). Horizontal scroll is the honest trade: a day×period matrix cannot reflow to 375px without becoming something else, so it keeps its real proportions instead.
+>
+> The original day-list spec is preserved below as the superseded design.
+
+- ~~Below 768px, grid becomes a vertical list: each day is a section header, sessions listed as cards underneath, chronologically.~~
+- ~~Card-per-session shows: time, subject, faculty, room, and lab-coordinator (if lab).~~
+- ~~Sticky day-section headers as the user scrolls.~~
 
 **Notes:**
 - No hover state on cells in this variant — no editing affordances (Principle 5).
@@ -495,6 +514,14 @@ Periods are **60 minutes**. There is no mid-morning break.
 - Filter options vary by role (Admin can filter by any dimension; Faculty can only filter by day/week).
 - Export currently a stub (PDF export deferred to future scope). Print is CSS-based, uses print stylesheet.
 - Day/Week toggle is the mobile default = Day; desktop default = Week.
+
+> **As built, 2026-08-01 — scope is narrower than the three variants above.**
+>
+> - **Only the Full variant exists.** Compact and Mobile aren't built because the Grid this toolbar sits above is desktop-only by design (§6), so there is no breakpoint where a collapsed toolbar would have a grid to control.
+> - **Export renders disabled**, matching the "stub" note. Print is real and drives `window.print()`; shell chrome and action buttons carry `print:hidden` so the printout is the schedule alone.
+> - **The filter is the section selector**, not a faculty/subject filter — "any dimension" collapses to one dimension in the built product, since a day×period grid is inherently per-section.
+> - **It only appears on the Admin and HOD screens**, not on the Read-Only My Timetable screens — a personal schedule has a single section and one week, so every control on the bar would be inert there. The three Figma read-only desktop screens (`340:573`, `341:573`, `341:593`) drew one; **removed 2026-08-01 (Prakash's call)** so Figma and code agree.
+> - **Day/Week toggle has no mobile default to speak of** — see §5's 2026-08-01 revision: mobile shows the full week and scrolls.
 
 ---
 

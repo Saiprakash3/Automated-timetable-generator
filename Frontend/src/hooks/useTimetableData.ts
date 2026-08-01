@@ -70,6 +70,37 @@ export function useArchivedDrafts() {
 }
 
 /**
+ * DOM id of the Timetable page's "Manage drafts" panel. Lives here rather
+ * than in the page so AdminShell's Status Pill (which navigates to it) does
+ * not have to import a page module from a layout.
+ */
+export const DRAFTS_ANCHOR = "manage-drafts";
+
+/**
+ * Deliberately NOT `behavior: "smooth"` — verified 2026-07-19 that smooth
+ * scrolling is a silent no-op in some environments (scroll position never
+ * moved, with `prefers-reduced-motion: false`), which would make this
+ * shortcut appear broken rather than merely un-animated. An instant jump is
+ * what a plain anchor link does anyway, and it works everywhere.
+ */
+export function scrollToDrafts() {
+  document.getElementById(DRAFTS_ANCHOR)?.scrollIntoView({ block: "start" });
+}
+
+/**
+ * Whether the Timetable page's "Manage drafts" panel is actually on screen —
+ * i.e. whether there is any draft history to open. Shared so the Status Pill
+ * (which offers a shortcut to that panel) and the panel itself can't disagree
+ * about when it exists: §8.3 hides it during an active HOD review cycle, so a
+ * pill offering to open it then would lead nowhere.
+ */
+export function useCanManageDrafts() {
+  const timetable = useTimetableData();
+  const drafts = useArchivedDrafts();
+  return drafts.length > 0 && timetable?.status !== "pending" && timetable?.status !== "approved";
+}
+
+/**
  * F-02 step 7 / INTERACTION_DECISIONS.md §11: confirming Send for Approval
  * IS the trigger — no external step, no round-trip. Moves Draft → Pending
  * HOD Approval and locks the timetable (Generate/Regenerate become

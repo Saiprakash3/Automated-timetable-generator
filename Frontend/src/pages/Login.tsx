@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ function errorMessageFor(err: ApiError, selectedRoleLabel: string): string {
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const expiryToastShown = useRef(false);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,6 +42,21 @@ export default function Login() {
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
 
   const canSubmit = identifier.trim() !== "" && password !== "" && !submitting;
+
+  /**
+   * FRONTEND_DOCUMENTATION_CHECKLIST.md §1's mid-session-expiry decision:
+   * "silent redirect to /login + an explanatory toast." services/api/client.ts
+   * has always done the redirect (`/login?reason=expired`) but nothing ever
+   * read the param, so the toast half was silently missing. Info variant, not
+   * danger — the checklist is explicit that expiry is routine, "not a scary
+   * error state." The ref guards React 18 StrictMode's double-effect in dev
+   * from firing it twice.
+   */
+  useEffect(() => {
+    if (searchParams.get("reason") !== "expired" || expiryToastShown.current) return;
+    expiryToastShown.current = true;
+    toast.info("Your session expired. Please log in again.");
+  }, [searchParams]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

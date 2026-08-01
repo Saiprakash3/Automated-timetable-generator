@@ -36,6 +36,21 @@ interface TimetableGridProps {
   /** View Controls' Day mode (DOMAIN_COMPONENTS.md §13) — renders just this
    *  one day's row instead of the full Mon–Fri week. */
   filterDay?: string;
+  /**
+   * Replaces the default two-line faculty/room body with one caller-supplied
+   * line. On a *personal* schedule the faculty is always the viewer, so
+   * `Claude design review V1.md` §3.24/§3.25 repurposes line 2 from *faculty*
+   * to *section · room* (Lab Coordinator: `Lab 204 · Dr. Nair`). Omitted for
+   * the section-grid callers, which keep faculty + room.
+   */
+  detail?: (entry: TimetableEntry) => string;
+  /**
+   * Time-only column headers (`9:00`) instead of `Period N` + range — what
+   * the read-only personal schedule uses, where the period *number* carries
+   * no meaning for the viewer and the narrower header buys real width back
+   * on a phone.
+   */
+  compactHeader?: boolean;
 }
 
 /**
@@ -47,32 +62,52 @@ interface TimetableGridProps {
  * isn't built here, since every current caller (Admin Draft/Approved,
  * HOD Approval Detail) is a desktop-only page already.
  */
-export function TimetableGrid({ entries, variant, selectedEntryId, onCellClick, filterDay }: TimetableGridProps) {
+export function TimetableGrid({
+  entries,
+  variant,
+  selectedEntryId,
+  onCellClick,
+  filterDay,
+  detail,
+  compactHeader,
+}: TimetableGridProps) {
   const isEdit = variant === "edit";
   const teachingSlots = TIME_SLOTS.filter((t) => t.type === "class");
   const days = filterDay ? DAYS.filter((d) => d === filterDay) : DAYS;
+  const lunch = TIME_SLOTS.find((t) => t.type === "lunch");
 
   return (
+    // Horizontal scroll is the mobile story for this grid: a day×period
+    // matrix can't reflow to a phone without becoming a different layout,
+    // so it keeps its real proportions and scrolls sideways instead. The
+    // day column is sticky so the row you're reading stays identifiable
+    // once the time columns scroll out from under it.
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[960px] border-collapse">
+      <table className="w-full min-w-[880px] border-collapse">
         <thead>
           <tr className="bg-muted">
-            <th className="w-28 border border-border p-2 text-left font-heading text-label font-semibold text-muted-foreground">
+            <th className="sticky left-0 z-base w-24 border border-border bg-muted p-2 text-left font-heading text-label font-semibold text-muted-foreground sm:w-28">
               &nbsp;
             </th>
             {teachingSlots.map((slot, i) => (
               <Fragment key={slot.period}>
                 {i === 3 && (
                   <th className="w-[72px] border border-border bg-muted p-2 text-center font-heading text-label font-semibold text-muted-foreground">
-                    Lunch
+                    {compactHeader ? lunch?.start : "Lunch"}
                   </th>
                 )}
                 <th className="border border-border p-2 text-center font-heading text-label font-semibold text-muted-foreground">
-                  Period {slot.period}
-                  <br />
-                  <span className="font-normal normal-case">
-                    {slot.start}–{slot.end}
-                  </span>
+                  {compactHeader ? (
+                    slot.start
+                  ) : (
+                    <>
+                      Period {slot.period}
+                      <br />
+                      <span className="font-normal normal-case">
+                        {slot.start}–{slot.end}
+                      </span>
+                    </>
+                  )}
                 </th>
               </Fragment>
             ))}
@@ -83,18 +118,23 @@ export function TimetableGrid({ entries, variant, selectedEntryId, onCellClick, 
             const cells = buildDayRow(day, entries);
             return (
               <tr key={day}>
-                <th className="border border-border bg-muted p-2 text-left font-heading text-label font-semibold text-muted-foreground">
+                <th className="sticky left-0 z-base border border-border bg-muted p-2 text-left font-heading text-label font-semibold text-muted-foreground">
                   {day}
                 </th>
                 {cells.map((cell) => (
                   <Fragment key={cell.period}>
-                    {cell.period === 4 && <td className="border border-border bg-muted" aria-hidden="true" />}
+                    {cell.period === 4 && (
+                      <td className="border border-border bg-muted text-center font-heading text-label text-muted-foreground">
+                        {compactHeader ? "Lunch" : ""}
+                      </td>
+                    )}
                     <Cell
                       day={day}
                       cell={cell}
                       isEdit={isEdit}
                       selected={isEdit && cell.entry?.id === selectedEntryId}
                       onClick={onCellClick}
+                      detail={detail}
                     />
                   </Fragment>
                 ))}
@@ -113,12 +153,14 @@ function Cell({
   isEdit,
   selected,
   onClick,
+  detail,
 }: {
   day: string;
   cell: GridCell;
   isEdit: boolean;
   selected: boolean;
   onClick?: (args: { day: string; period: number; entry: TimetableEntry | null }) => void;
+  detail?: (entry: TimetableEntry) => string;
 }) {
   const { entry, span, period } = cell;
 
@@ -149,13 +191,21 @@ function Cell({
             {entry.type === "lab" && <FlaskConical className="size-3.5 shrink-0" aria-hidden="true" />}
             {entry.subject}
           </p>
-          <p className="truncate font-body text-sm text-muted-foreground" title={entry.facultyName}>
-            {entry.facultyName}
-          </p>
-          <p className="truncate font-heading text-label text-muted-foreground" title={entry.room}>
-            {entry.room}
-            {entry.basket ? ` · ${entry.basket}` : ""}
-          </p>
+          {detail ? (
+            <p className="truncate font-heading text-label text-muted-foreground" title={detail(entry)}>
+              {detail(entry)}
+            </p>
+          ) : (
+            <>
+              <p className="truncate font-body text-sm text-muted-foreground" title={entry.facultyName}>
+                {entry.facultyName}
+              </p>
+              <p className="truncate font-heading text-label text-muted-foreground" title={entry.room}>
+                {entry.room}
+                {entry.basket ? ` · ${entry.basket}` : ""}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <p className="font-body text-sm text-muted-foreground">{isEdit ? "Click to fill" : "Free"}</p>

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Frontend", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "mock-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Backend/mock-backend", "start"],
+      "port": 4000
+    }
+  ]
+}

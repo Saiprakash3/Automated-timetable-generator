@@ -4,27 +4,38 @@ import { useTimetableData } from "@/hooks/useTimetableData";
 import { useFacultyData } from "@/hooks/useFacultyData";
 import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
 import { resolveMyEntries } from "@/lib/resolveMyEntries";
+import { TimetableGrid } from "@/components/domain/TimetableGrid";
+import type { TimetableEntry, User } from "@/types";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-
-function periodLabel(periodStart: number, periodEnd: number) {
-  return periodStart === periodEnd ? `Period ${periodStart}` : `Period ${periodStart}–${periodEnd}`;
+/**
+ * The role-specific second line, matching `Claude design review V1.md`
+ * §3.24/§3.25: on a personal schedule the faculty is always the viewer, so
+ * line 2 carries *section · room* instead of the faculty name. The Lab
+ * Coordinator is the exception — they're the second person on the session,
+ * not the teacher, so they need to know who they're paired with.
+ */
+function detailFor(user: User) {
+  return (entry: TimetableEntry) => {
+    const basket = entry.basket ? ` · ${entry.basket}` : "";
+    if (user.role === "lab_coordinator") return `${entry.room} · ${entry.facultyName}${basket}`;
+    if (user.role === "faculty" || user.role === "hod") return `${entry.section} · ${entry.room}${basket}`;
+    return `${entry.facultyName} · ${entry.room}${basket}`;
+  };
 }
 
 /**
  * F-08 — the primary view for Faculty, Student, Lab Coordinator, and
- * HOD-as-teacher. Mobile-first vertical day-list (DOMAIN_COMPONENTS.md §5's
- * "Mobile adaptation": each day a section header, sessions as cards
- * underneath, chronologically) — the desktop wide-grid variant
- * (INTERACTION_DECISIONS.md §10.2) isn't built; this list also works fine
- * at desktop widths, just narrower than a full grid would be.
+ * HOD-as-teacher. Uses the same day×period matrix as the desktop design
+ * (`Claude design review V1.md` §3.24 `HOD — My Timetable` 333:9556 and
+ * §3.25's three desktop role screens), on every breakpoint: the grid keeps
+ * its real proportions and scrolls horizontally on a phone rather than
+ * reflowing into a different layout. This replaces the earlier vertical
+ * day-list of cards — DOMAIN_COMPONENTS.md §5's "Mobile adaptation" — at
+ * Prakash's request (2026-07-19), so mobile and desktop now read the same.
  *
- * Card content is role-specific, matching what each role actually needs to
- * know (DOMAIN_COMPONENTS.md §10.4's own reasoning): Faculty/HOD see the
- * section they're teaching (the faculty name is always the viewer, so
- * showing it back would be noise); Lab Coordinator sees which teaching
- * Faculty they're paired with, since the coordinator is the second person,
- * not the teacher; Student sees the faculty teaching them.
+ * Cells the viewer isn't scheduled for correctly read "Free", exactly as the
+ * design's 5-sessions/25-Free HOD screen does — a personal schedule is the
+ * whole week with your own sessions in it, not just a list of what you teach.
  */
 export default function MyTimetable() {
   const { user } = useSession();
@@ -64,48 +75,15 @@ export default function MyTimetable() {
     );
   }
 
-  const isLabCoordinator = user.role === "lab_coordinator";
-  const isFacultyLike = user.role === "faculty" || user.role === "hod";
-
   return (
-    <div className="space-y-6">
-      {DAYS.map((day) => {
-        const dayEntries = myEntries
-          .filter((e) => e.day === day)
-          .sort((a, b) => a.periodStart - b.periodStart);
-        if (dayEntries.length === 0) return null;
+    <div className="space-y-4">
+      <TimetableGrid entries={myEntries} variant="readOnly" detail={detailFor(user)} compactHeader />
 
-        return (
-          <div key={day} className="space-y-2">
-            <h2 className="font-heading text-h3 font-semibold text-foreground">{day}</h2>
-            <div className="space-y-2">
-              {dayEntries.map((e) => (
-                <div key={e.id} className="rounded-lg border border-border bg-card p-4 shadow-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-heading text-label font-medium tracking-wide text-muted-foreground uppercase">
-                      {periodLabel(e.periodStart, e.periodEnd)}
-                    </p>
-                    {e.type !== "regular" && (
-                      <span className="font-heading text-label font-medium text-muted-foreground capitalize">
-                        {e.type}
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-body font-bold text-foreground">{e.subject}</p>
-                  <p className="font-body text-sm text-muted-foreground">
-                    {isLabCoordinator
-                      ? `${e.room} · with ${e.facultyName}`
-                      : isFacultyLike
-                        ? `${e.section} · ${e.room}`
-                        : `${e.facultyName} · ${e.room}`}
-                    {e.basket ? ` · ${e.basket}` : ""}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      {user.role === "lab_coordinator" && (
+        <p className="font-body text-sm text-muted-foreground">
+          Labs you're coordinating — not counted toward teaching load.
+        </p>
+      )}
     </div>
   );
 }

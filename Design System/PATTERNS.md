@@ -302,7 +302,7 @@ Per Principle 5, read-only and editable are designed states, not variations of o
 - Trigger: HOD clicks Reject + provides reason
 - Grid becomes editable again for Admin
 - Status Pill returns to Draft
-- Toast (warning variant) for Admin on next visit: "HOD requested changes. See message."
+- Toast (warning variant) for Admin on next visit: "HOD requested changes. See message." — *built 2026-08-01; it fires once per rejection, tracked at module scope rather than component state, since the Timetable page remounts on every navigation and component state would re-announce the same rejection each time Admin opened the screen.*
 
 **Approved → Published:**
 - Trigger: Admin clicks Publish + type-to-confirm + Publish (see Pattern 1.2)
@@ -534,6 +534,8 @@ Can't generate a new timetable — waiting for HOD's response. Generation is ava
 - First timetable ever (Setup complete, status is "No timetable yet")
 - After HOD has requested changes (status returns to Draft — Admin edits existing draft OR regenerates)
 - Not at any other time: Approved and Published states also block generation
+
+> ⚠️ **The gating is built; the Toast is deliberately not.** Generate/Regenerate are **hidden** outside Draft rather than rendered-and-disabled, so there is no control left to activate — not by click, not by keyboard. The Toast as specified could only ever fire from a path that doesn't exist, so building it would add unreachable code that reads as covered behaviour. Build it if a reachable attempt is ever reintroduced (a retained keyboard shortcut, or switching the buttons from hidden to disabled).
 
 ### 8.2 Draft count — warning on 3rd draft
 

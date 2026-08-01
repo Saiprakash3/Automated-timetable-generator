@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { Lock, TriangleAlert, Trash2 } from "lucide-react";
 import { StatusPill } from "@/components/domain/StatusPill";
 import { Button } from "@/components/ui/button";
@@ -6,7 +8,14 @@ import { TimetableGrid } from "@/components/domain/TimetableGrid";
 import { CellEditDrawer } from "@/components/domain/CellEditDrawer";
 import { ViewControls, type GridView } from "@/components/domain/ViewControls";
 import { DeleteDraftDialog } from "@/components/domain/DeleteDraftDialog";
-import { useTimetableData, useArchivedDrafts, setGeneratedTimetable } from "@/hooks/useTimetableData";
+import {
+  useTimetableData,
+  useArchivedDrafts,
+  useCanManageDrafts,
+  setGeneratedTimetable,
+  DRAFTS_ANCHOR,
+  scrollToDrafts,
+} from "@/hooks/useTimetableData";
 import { useSetupCategories, getSetupSummary } from "@/lib/setupCategories";
 import { generateTimetable } from "@/lib/generateTimetable";
 import { useSubjectData } from "@/hooks/useSubjectData";
@@ -40,9 +49,20 @@ import type { TimetableEntry } from "@/types";
  * this UI. Add the Toast once a path to attempt it anyway exists (e.g. a
  * kept keyboard shortcut).
  */
+/**
+ * PATTERNS.md §4.2's Pending → Draft (rejection) row promises Admin a warning
+ * Toast "on next visit" — distinct from the persistent Review Note banner,
+ * which is what actually got built. Tracking which rejections have already
+ * been announced at module scope (not component state) is what makes "on next
+ * visit" true: the page remounts on every navigation, so component state would
+ * re-fire the same toast every single time Admin opened the screen.
+ */
+const announcedRejections = new Set<string>();
+
 export default function TimetableGenerate() {
   const timetable = useTimetableData();
   const archivedDrafts = useArchivedDrafts();
+  const canManageDrafts = useCanManageDrafts();
   const categories = useSetupCategories();
   const { completed, total } = getSetupSummary(categories);
   const setupComplete = completed === total;
@@ -68,6 +88,22 @@ export default function TimetableGenerate() {
     null,
   );
   const [deleteDraftId, setDeleteDraftId] = useState<string | null>(null);
+
+  const changesRequestedAt = timetable?.changesRequestedAt;
+  useEffect(() => {
+    if (!changesRequestedAt || announcedRejections.has(changesRequestedAt)) return;
+    announcedRejections.add(changesRequestedAt);
+    toast.warning("HOD requested changes. See message.");
+  }, [changesRequestedAt]);
+
+  // Arriving from AdminShell's Status Pill, which links here with the anchor.
+  // Deferred a frame so the panel it targets has actually rendered.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash !== `#${DRAFTS_ANCHOR}`) return;
+    const id = requestAnimationFrame(scrollToDrafts);
+    return () => cancelAnimationFrame(id);
+  }, [hash]);
 
   function handleGenerate() {
     setGenerating(true);
@@ -119,6 +155,8 @@ export default function TimetableGenerate() {
           <StatusPill
             state={timetable.status}
             publishedAt={timetable.publishedAt ? new Date(timetable.publishedAt).toLocaleString() : undefined}
+            onClick={canManageDrafts ? scrollToDrafts : undefined}
+            actionLabel={canManageDrafts ? "View draft history" : undefined}
           />
           <div className="flex gap-2 print:hidden">
             {isDraft && <Button onClick={() => setSendDialogOpen(true)}>Send for Approval</Button>}
@@ -222,7 +260,7 @@ export default function TimetableGenerate() {
       })()}
 
       {!isPending && !isApproved && archivedDrafts.length > 0 && (
-        <div className="space-y-3 rounded-lg border border-border p-4 print:hidden">
+        <div id={DRAFTS_ANCHOR} className="space-y-3 rounded-lg border border-border p-4 print:hidden">
           <h2 className="font-heading text-h3 font-semibold text-foreground">Manage drafts</h2>
           <p className="font-body text-sm text-muted-foreground">
             Past drafts HOD has already reviewed, kept for comparison. Deleting one removes it permanently.

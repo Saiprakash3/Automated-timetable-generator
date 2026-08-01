@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { deleteDraft } from "@/hooks/useTimetableData";
@@ -21,6 +22,10 @@ export function DeleteDraftDialog({ open, onOpenChange, draftId, draftNumber, on
     deleteDraft(draftId);
     onOpenChange(false);
     onDeleted?.();
+    // Deletion is irreversible and removes a row the user was just looking
+    // at — confirming it actually happened is the point (COMPONENTS.md §C.1:
+    // toasts are for system-initiated confirmation of a completed action).
+    toast.success(`Draft ${draftNumber} deleted.`);
   }
 
   return (

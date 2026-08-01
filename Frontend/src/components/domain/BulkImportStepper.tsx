@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { FileDown, Upload, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -140,10 +141,19 @@ export function BulkImportStepper<T>({
 
   function handleConfirm() {
     setImporting(true);
+    const total = validRows.length;
+    const skipped = errorRows.length;
     let i = 0;
     function commitNext() {
-      if (i >= validRows.length) {
+      if (i >= total) {
         handleOpenChange(false);
+        // The modal closing is the only other signal the import finished, and
+        // it closes the same way Cancel does — so without this there's nothing
+        // distinguishing "imported 12 rows" from "changed my mind."
+        toast.success(
+          `${total} ${total === 1 ? "row" : "rows"} imported.` +
+            (skipped > 0 ? ` ${skipped} skipped due to errors.` : ""),
+        );
         return;
       }
       const row = validRows[i];

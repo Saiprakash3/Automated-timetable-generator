@@ -215,15 +215,22 @@
   --font-heading: "DM Sans", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
 
-  /* Body (16px) = Tailwind's text-base, Body Small (14px) = text-sm,
-     Label (12px) = text-xs — all exact matches, not redeclared.
-     H1/H2/H3 have no Tailwind-default equivalent name, so they're new. */
+  /* Body (16px) = Tailwind's text-base, Body Small (14px) = text-sm —
+     exact matches, not redeclared. H1/H2/H3 have no Tailwind-default
+     equivalent name, so they're new. Label is 12px like Tailwind's
+     text-xs BUT its line-height differs (FOUNDATIONS §11 pairs Label with
+     leading-normal 1.5; text-xs defaults to ~1.333), and the components use
+     the semantic `text-label` name — a class Tailwind doesn't generate on its
+     own. So Label IS declared here: without it `text-label` emits no rule and
+     every pill/table-header silently falls back to inherited 16px. */
   --text-h1: 2rem; /* 32px */
   --text-h1--line-height: 1.25;
   --text-h2: 1.5rem; /* 24px */
   --text-h2--line-height: 1.25;
   --text-h3: 1.25rem; /* 20px */
   --text-h3--line-height: 1.5;
+  --text-label: 0.75rem; /* 12px — FOUNDATIONS §11, fixed below the scale curve */
+  --text-label--line-height: 1.5; /* leading-normal, per --text-label-style */
   /* Font weight isn't paired automatically — apply Tailwind's existing
      font-semibold (H1/H2) or font-medium (H3/Label) alongside these.
      Recipe: className="text-h1 font-semibold font-heading" */

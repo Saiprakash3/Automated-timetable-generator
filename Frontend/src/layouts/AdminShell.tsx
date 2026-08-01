@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutGrid, Calendar, Settings, Circle, CircleDashed, CheckCircle2, Lock } from "lucide-react";
 import { useSession, logout } from "@/hooks/useSession";
 import { StatusPill } from "@/components/domain/StatusPill";
-import { useTimetableData } from "@/hooks/useTimetableData";
+import { useTimetableData, useCanManageDrafts, DRAFTS_ANCHOR, scrollToDrafts } from "@/hooks/useTimetableData";
 import { useSetupCategories, type SetupCategory } from "@/lib/setupCategories";
 import type { SetupCategoryState } from "@/components/domain/SetupChecklistRow";
 import {
@@ -59,6 +59,7 @@ export default function AdminShell() {
   const categories = useSetupCategories();
   const breadcrumb = useBreadcrumb(categories);
   const timetable = useTimetableData();
+  const canManageDrafts = useCanManageDrafts();
 
   // RequireAuth in App.tsx already guards this route; the check here is
   // purely to satisfy TypeScript's null-narrowing for `user.*` below.
@@ -132,7 +133,21 @@ export default function AdminShell() {
         <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6 print:hidden">
           <p className="font-body text-sm text-muted-foreground">{breadcrumb}</p>
           <div className="flex items-center gap-4">
-            <StatusPill state={timetable?.status ?? "none"} />
+            <StatusPill
+              state={timetable?.status ?? "none"}
+              onClick={
+                canManageDrafts
+                  ? () => {
+                      // Already there: scroll directly. Navigating instead
+                      // would be a no-op the second time, since the hash
+                      // wouldn't change and the page's effect wouldn't re-fire.
+                      if (pathname === "/timetable") scrollToDrafts();
+                      else navigate(`/timetable#${DRAFTS_ANCHOR}`);
+                    }
+                  : undefined
+              }
+              actionLabel={canManageDrafts ? "View draft history" : undefined}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full bg-primary/10 font-heading text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 {initials(user.name)}

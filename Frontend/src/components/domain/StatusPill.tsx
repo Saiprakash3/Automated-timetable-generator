@@ -24,24 +24,63 @@ interface StatusPillProps {
   publishedAt?: string;
   size?: "sm" | "default";
   className?: string;
+  /**
+   * Opt-in interactivity. The pill is a status *display* by default
+   * (DOMAIN_COMPONENTS.md §1 defines no click behavior), so it stays a plain
+   * `<span>` unless a caller has somewhere real to send the click — currently
+   * only "open draft history," and only when there IS history to open. A pill
+   * that looks clickable but does nothing is the exact dead-click this was
+   * added to fix, so the element type follows the behavior rather than being
+   * a button that's sometimes inert.
+   */
+  onClick?: () => void;
+  /** Accessible name for the interactive variant — the visible label is the
+   *  status, which doesn't describe what activating it does. */
+  actionLabel?: string;
 }
 
-export function StatusPill({ state, publishedAt, size = "default", className }: StatusPillProps) {
+export function StatusPill({
+  state,
+  publishedAt,
+  size = "default",
+  className,
+  onClick,
+  actionLabel,
+}: StatusPillProps) {
   const { label, icon: Icon, colorClass } = CONFIG[state];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-heading text-label font-semibold tracking-wide",
-        size === "sm" ? "h-5" : "h-7",
-        colorClass,
-        className,
-      )}
-    >
+  const shared = cn(
+    "inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-heading text-label font-semibold tracking-wide",
+    size === "sm" ? "h-5" : "h-7",
+    colorClass,
+    className,
+  );
+  // The hover underline is scoped to the label rather than sitting on the
+  // button, so Published's " — {timestamp}" suffix isn't dragged into it —
+  // underlining the whole "Published — Mar 15, 2:30 PM" string reads as a
+  // rule through the pill rather than as an affordance on the thing you
+  // click through to. Named group (`/pill`) so an ancestor's `group` can't
+  // trigger it.
+  const content = (
+    <>
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       <span>
-        {label}
+        <span className={cn(onClick && "underline-offset-2 group-hover/pill:underline")}>{label}</span>
         {state === "published" && publishedAt ? ` — ${publishedAt}` : ""}
       </span>
-    </span>
+    </>
+  );
+
+  if (!onClick) return <span className={shared}>{content}</span>;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={actionLabel}
+      title={actionLabel}
+      className={cn(shared, "group/pill cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring")}
+    >
+      {content}
+    </button>
   );
 }

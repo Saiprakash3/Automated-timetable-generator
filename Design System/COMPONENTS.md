@@ -185,7 +185,9 @@ Timetable-specific components (grid, cell, status pill, conflict badge, etc.) li
 - Shadow: `--shadow-3`
 - Z-index: `--z-toast`
 - Enter animation: slide from top-right, `--duration-moderate` + `--ease-enter`
-- Auto-dismiss (Info, Success): 5 seconds. Warning: 8 seconds. Danger: no auto-dismiss — user must dismiss.
+- Auto-dismiss (Info, Success): ~~5 seconds~~ **3 seconds**. Warning: ~~8 seconds~~ **5 seconds**. Danger: no auto-dismiss — user must dismiss.
+
+> 🔄 **Shortened 2026-08-01 (Prakash)** — 5s/8s read as too long in use. Worth knowing for anyone re-tuning these: the toast library pauses its dismiss countdown entirely while the cursor rests near the toast or the tab is unfocused, so a toast can appear "stuck" regardless of the configured duration. Toasts render top-right and several of the buttons that fire them (Publish, Send for Approval, Approve) also sit top-right, which makes that pause easy to trigger by accident. Shortening the duration was chosen over disabling the pause, since the pause is correct behaviour when someone is actually reading.
 
 **Notes:**
 - Toasts are for **system-initiated** informational messages (Save succeeded, HOD's approval arrived). User-initiated confirmations go through Confirmation Dialog (see C.4).
@@ -633,13 +635,20 @@ Shells are the outer frame of the application for each role. Per Principle 4, th
 **Purpose:** Mobile-first minimal shell for Faculty, Student, Lab Coordinator, and HOD-as-teacher viewing their own timetable.
 
 **Layout (mobile, ≤640px):**
-- Top bar (48px height, fixed) — product name + user avatar (right)
-- Below top bar: role greeting ("Hi, [Name]") + "Published — as of [date]" timestamp caption
-- Main content: single-column responsive layout of the user's schedule
+- Top bar (48px height, fixed) — product name + viewer's name (right)
+- Below top bar: role-specific schedule title + clock-icon "Published — as of [date]" timestamp caption
+- Main content: the day×period grid, scrolling horizontally (see `DOMAIN_COMPONENTS.md` §5)
 
 **Layout (tablet/desktop, ≥768px):**
 - Top bar (56px height)
-- Same layout as mobile but grid-based schedule view instead of vertical list
+- Same layout as mobile — the schedule view no longer differs by breakpoint
+
+> 🔄 **Revised 2026-08-01 (Prakash).** Two changes from the original spec, both so mobile and desktop stop being different products:
+>
+> 1. **The `"Hi, [Name]"` greeting is replaced by a role-specific title** — *My teaching schedule* (Faculty/HOD), *My lab schedule* (Lab Coordinator), *My class schedule* (Student). The greeting answered "who am I", which the viewer already knows; the title answers "what am I looking at", which on a shared department machine is the useful question. The viewer's **name moves to the top bar**, so a shared device still shows whose schedule is on screen.
+> 2. **The schedule is the same grid at every breakpoint** — the "vertical list on mobile, grid on desktop" split is gone.
+>
+> Original wording preserved in git history.
 
 **States:**
 - No auth-error state (login handles that at the shell root)
