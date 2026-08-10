@@ -410,6 +410,30 @@ See §D.3 below. Confirmation Dialog is technically a specialization of Dialog b
 
 ---
 
+### E.3 Error Screen
+
+**Purpose:** A whole-page failure the user cannot act their way out of from within a normal screen. Added 2026-08-01 — the system had **no page-level error design at all**.
+
+**Variants (3):**
+
+| Variant | Trigger | Figma | Actions |
+|---|---|---|---|
+| Not found (404) | URL matches no route | `558:11582` | Go to my dashboard |
+| No access (403) | Signed in, wrong role for this route | `558:11594` | Go to my dashboard |
+| Something went wrong | A render throw caught by the boundary; also serves a hard server failure | `558:11604` | Reload page · Go to my dashboard |
+
+**Anatomy:** centred card on `--muted` page background — 32px icon, H3 title, body copy, action row. Max width 520px.
+
+**Notes:**
+
+- **Always standalone — never inside a shell.** All three render *outside* every shell: `path="*"` and the role guard both sit above the shell routes, and the crash fallback cannot assume the shell survived, because the shell may be what threw. A first pass at these screens wrongly placed them inside the Admin shell, which also produced a self-contradiction — Admin sidebar next to copy saying "you're signed in as Faculty".
+- **Every variant carries an action.** These are dead ends by definition; without one the only exit is the browser's Back button.
+- **404 must not promise the page later.** The previous implementation rendered the "coming soon" placeholder, so a typo'd link told the user the page *would exist* — worse than no 404, since it invites them to wait for something that will never arrive.
+- **403 states the reason and who fixes it.** The role guard used to `<Navigate>` silently, moving the URL out from under the user with no explanation, which reads as a broken link rather than a permission boundary.
+- **The crash variant reloads rather than resetting state.** The subtree that threw is in an unknown state; clearing the error flag re-renders straight back into the same throw.
+
+---
+
 ## F. Navigation
 
 ### F.1 Tab / Tab Group
@@ -464,7 +488,11 @@ See §D.3 below. Confirmation Dialog is technically a specialization of Dialog b
 
 **States (per row):** default, hover, selected (Selectable variant), disabled.
 
-**Anatomy:** header row + body rows + optional footer + optional pagination.
+**Anatomy:** header row + body rows + **trailing Actions column** + optional footer + optional pagination.
+
+**Actions column (added 2026-08-01).** Every row that represents an editable record carries a trailing, right-aligned Actions column: an **Edit** Icon Button (Ghost) and a **Delete** Icon Button (Ghost, `--danger-600` icon). Fixed 60px wide, 16px icons in 28px buttons, `space-1` between them; the header cell is labelled `ACTIONS`, right-aligned, in the standard header style.
+
+> **This replaced a kebab/overflow menu.** The generic Table component used to end each row with a "…" menu, and the eight bespoke Setup tables had no row affordance at all. That was reported as a bug — *"there is no edit option in each step; by mistake if admin enters wrong data he should be able to edit the entry."* Two reasons the explicit pair wins here over an overflow menu: Setup is **low-frequency, high-consequence** data entry where a typo must be correctable without hunting, and with only two actions a menu costs an extra click to reveal exactly as many targets as it hides. Reach for an overflow menu only once a row needs a third-or-later action.
 
 **Tokens consumed:**
 - Row background: `--background` at rest, `--muted` on hover
@@ -479,6 +507,10 @@ See §D.3 below. Confirmation Dialog is technically a specialization of Dialog b
 - Per audit §17.5, tables must support column sorting — this is a core requirement, not optional.
 - Empty state within a Table uses the Table's own layout (empty row with centered Empty State) rather than replacing the entire Table.
 - Loading state: Skeleton rows (default 5 rows).
+- **Both action buttons need a record-specific accessible name** — `aria-label="Edit Data Structures"`, not `aria-label="Edit"`. A table of twenty identically-labelled "Edit" buttons is unusable on a screen reader, and A.2 already requires a label on every Icon Button. The visible icon carries no record identity, so the label must.
+- Actions are **always visible, not hover-revealed.** Hover-only row actions are invisible to keyboard and touch users and undiscoverable on first read — the exact failure this column was added to fix.
+- Delete opens the Pattern 1.1 destructive confirmation; Edit opens the Edit Record dialog (D.1 Dialog, see PATTERNS.md Pattern 9). Neither acts immediately on click.
+- Figma: `Table Row Actions` component `521:56`; generic `Table` component `67:3`.
 
 ---
 

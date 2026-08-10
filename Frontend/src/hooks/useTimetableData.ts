@@ -88,16 +88,23 @@ export function scrollToDrafts() {
 }
 
 /**
- * Whether the Timetable page's "Manage drafts" panel is actually on screen —
- * i.e. whether there is any draft history to open. Shared so the Status Pill
- * (which offers a shortcut to that panel) and the panel itself can't disagree
- * about when it exists: §8.3 hides it during an active HOD review cycle, so a
- * pill offering to open it then would lead nowhere.
+ * Whether the Timetable page's draft-history panel is reachable — shared so the
+ * Status Pill (which offers a shortcut to it) and the panel itself can't
+ * disagree about when it exists.
+ *
+ * **No longer requires drafts to exist** (2026-08-01). It used to also demand
+ * `drafts.length > 0`, which killed the pill's dead-click by removing the
+ * affordance entirely. The design now answers that the other way round — the
+ * panel has a real empty state ("Currently there are no drafts…", PATTERNS.md
+ * §8.4), so there is always somewhere to land, and a destination that explains
+ * what will fill it teaches more than a pill that inertly stops being a button.
+ *
+ * The mid-review exclusion stays: §8.3 hides the panel during an active HOD
+ * cycle, where drafts genuinely cannot be acted on.
  */
-export function useCanManageDrafts() {
+export function useCanOpenDraftHistory() {
   const timetable = useTimetableData();
-  const drafts = useArchivedDrafts();
-  return drafts.length > 0 && timetable?.status !== "pending" && timetable?.status !== "approved";
+  return timetable?.status !== "pending" && timetable?.status !== "approved";
 }
 
 /**

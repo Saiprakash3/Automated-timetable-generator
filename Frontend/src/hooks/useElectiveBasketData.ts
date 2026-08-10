@@ -1,50 +1,25 @@
-import { useSyncExternalStore } from "react";
 import type { ElectiveBasket } from "@/types";
+import { setupApi } from "@/services/api/setup";
+import { createSetupStore } from "./createSetupStore";
 
 /**
- * Same placeholder pattern as the other useXData hooks. "Basket A" isn't
- * invented: `Claude design review V1.md` names it explicitly — Dr. Gupta's
- * Machine Learning elective and Dr. Iyer's NLP elective (his second
- * elective, per the same review's HOD-mapping reasoning), in Room 210 and
- * Room 212 respectively. Assigned to 3rd year (sections 3A/3B) and Period 5
- * (2:00–3:00) — a plain, non-conflicting choice; the review's own history of
- * this basket's time slot shifted more than once while chasing an unrelated
- * clash, so no single historical slot value is authoritative to replay here.
- * Only one basket seeded (4th year still empty) — matches setupCategories.ts's
- * "partial" state for this category.
+ * Backed by the `elective_baskets` + `electives` tables, which did not exist
+ * until this was wired up — a basket previously survived only as the `basket`
+ * string column on generated timetable entries, so the configuration itself
+ * had nowhere to live. The nested electives are created with the basket in a
+ * single request (see setupApi.createElectiveBasket).
  */
-let baskets: ElectiveBasket[] = [
-  {
-    id: "EB-A",
-    name: "3rd Year — Elective Basket A",
-    year: 3,
-    period: 5,
-    sectionIds: ["SEC-3A", "SEC-3B"],
-    electives: [
-      { id: "EL-ML", subjectId: "S-CS209", facultyId: "F-GUPTA", roomId: "R-210" },
-      { id: "EL-NLP", subjectId: "S-CS213", facultyId: "F-IYER", roomId: "R-212" },
-    ],
-  },
-];
-const listeners = new Set<() => void>();
+const store = createSetupStore<ElectiveBasket>({
+  label: "elective baskets",
+  list: setupApi.getElectiveBaskets,
+  create: setupApi.createElectiveBasket,
+  update: setupApi.updateElectiveBasket,
+  remove: setupApi.deleteElectiveBasket,
+});
 
-function notify() {
-  for (const listener of listeners) listener();
-}
-
-export function addElectiveBasket(record: Omit<ElectiveBasket, "id">) {
-  const newRecord: ElectiveBasket = { ...record, id: `EB-${Date.now()}` };
-  baskets = [...baskets, newRecord];
-  notify();
-  return newRecord;
-}
-
-export function useElectiveBasketData() {
-  return useSyncExternalStore(
-    (callback) => {
-      listeners.add(callback);
-      return () => listeners.delete(callback);
-    },
-    () => baskets,
-  );
-}
+export const addElectiveBasket = store.add;
+export const updateElectiveBasket = store.update;
+export const removeElectiveBasket = store.remove;
+export const refreshElectiveBaskets = store.refresh;
+export const useElectiveBasketData = store.useData;
+export const useElectiveBasketsLoading = store.useIsLoading;

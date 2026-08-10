@@ -18,4 +18,13 @@ export interface Faculty {
   name: string;
   department: string;
   canServeAsLabCoordinator: boolean;
+  /**
+   * Subject ids this person is qualified to teach — backs conflict #18
+   * (INTERACTION_DECISIONS.md §1.2/§13). Distinct from Subject–Faculty
+   * Mapping, which records assignments already made; this records what may be
+   * assigned. **An empty list means unrestricted, not unqualified** — every
+   * faculty record predates this field, so treating empty as "teaches nothing"
+   * would flag every entry on every existing timetable.
+   */
+  canTeachSubjectIds: string[];
 }

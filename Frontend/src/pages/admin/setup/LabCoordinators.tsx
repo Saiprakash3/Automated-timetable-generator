@@ -2,9 +2,12 @@ import { useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
+import { useLabCoordinatorData, removeLabCoordinator } from "@/hooks/useLabCoordinatorData";
 import { useLabData } from "@/hooks/useLabData";
 import { AddLabCoordinatorDialog } from "./AddLabCoordinatorDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { LabCoordinator } from "@/types";
 
 /** Same structure as Faculty.tsx — see its notes on the omitted checkbox
  *  column and the disabled Import button; both apply here too. "Labs
@@ -14,6 +17,8 @@ export default function LabCoordinatorsSetup() {
   const coordinators = useLabCoordinatorData();
   const labs = useLabData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<LabCoordinator | null>(null);
+  const [deleting, setDeleting] = useState<LabCoordinator | null>(null);
 
   function labNames(labIds: string[]) {
     if (labIds.length === 0) return "—";
@@ -60,6 +65,7 @@ export default function LabCoordinatorsSetup() {
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Labs coordinated</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -68,6 +74,13 @@ export default function LabCoordinatorsSetup() {
                   <TableCell className="font-medium text-foreground">{c.name}</TableCell>
                   <TableCell className="text-muted-foreground">{c.department}</TableCell>
                   <TableCell className="text-muted-foreground">{labNames(c.labIds)}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={c.name}
+                      onEdit={() => { setEditing(c); setAddOpen(true); }}
+                      onDelete={() => setDeleting(c)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -75,7 +88,18 @@ export default function LabCoordinatorsSetup() {
         </div>
       )}
 
-      <AddLabCoordinatorDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddLabCoordinatorDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? deleting.name : ""}
+        categoryLabel="coordinator list"
+        onConfirm={() => removeLabCoordinator(deleting!.id)}
+      />
     </div>
   );
 }

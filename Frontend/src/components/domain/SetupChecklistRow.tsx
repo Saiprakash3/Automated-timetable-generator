@@ -1,8 +1,9 @@
-import { Circle, CircleDashed, CheckCircle2, Lock, ChevronRight } from "lucide-react";
+import { Circle, CircleDashed, CheckCircle2, Lock, ChevronRight, LoaderCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-export type SetupCategoryState = "empty" | "partial" | "complete" | "blocked";
+/** `loading` is distinct from `empty` on purpose — see setupCategories.ts. */
+export type SetupCategoryState = "loading" | "empty" | "partial" | "complete" | "blocked";
 
 interface SetupChecklistRowProps {
   name: string;
@@ -15,6 +16,7 @@ interface SetupChecklistRowProps {
 }
 
 const STATE_ICON: Record<SetupCategoryState, typeof Circle> = {
+  loading: LoaderCircle,
   empty: Circle,
   partial: CircleDashed,
   complete: CheckCircle2,
@@ -22,6 +24,7 @@ const STATE_ICON: Record<SetupCategoryState, typeof Circle> = {
 };
 
 const STATE_ICON_CLASS: Record<SetupCategoryState, string> = {
+  loading: "text-muted-foreground animate-spin",
   empty: "text-muted-foreground",
   partial: "text-warning-500",
   complete: "text-success-solid",

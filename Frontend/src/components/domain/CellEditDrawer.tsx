@@ -19,6 +19,7 @@ import { useFacultyData } from "@/hooks/useFacultyData";
 import { useRoomData } from "@/hooks/useRoomData";
 import { useLabData } from "@/hooks/useLabData";
 import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
+import { useElectiveBasketData } from "@/hooks/useElectiveBasketData";
 import { checkEntryConflicts } from "@/lib/checkEntryConflicts";
 import { ConflictBadge } from "./ConflictBadge";
 import type { TimetableEntry } from "@/types";
@@ -32,6 +33,12 @@ interface CellEditDrawerProps {
   sectionLabel: string;
   sectionStudentCount?: number;
   allEntries: TimetableEntry[];
+  /**
+   * Jump to the entry a blocking conflict names. The grid shows one section at
+   * a time, so a cross-section collision points at a cell the user cannot see
+   * — without this the message is a dead end.
+   */
+  onNavigateToEntry?: (target: { id: string; section: string; day: string; periodStart: number }) => void;
 }
 
 /**
@@ -71,12 +78,14 @@ export function CellEditDrawer({
   sectionLabel,
   sectionStudentCount,
   allEntries,
+  onNavigateToEntry,
 }: CellEditDrawerProps) {
   const subjects = useSubjectData();
   const faculty = useFacultyData();
   const rooms = useRoomData();
   const labs = useLabData();
   const coordinators = useLabCoordinatorData();
+  const baskets = useElectiveBasketData();
 
   const isElective = entry?.type === "elective";
   const isLab = entry?.type === "lab";
@@ -140,15 +149,58 @@ export function CellEditDrawer({
   const conflicts = useMemo(() => {
     if (!facultyId && !room) return [];
     return checkEntryConflicts({
-      candidate: { id: entry?.id ?? "DRAFT-NEW", day, periodStart: period, periodEnd, facultyId, facultyName, room },
+      candidate: {
+        id: entry?.id ?? "DRAFT-NEW",
+        day,
+        periodStart: period,
+        periodEnd,
+        facultyId,
+        facultyName,
+        room,
+        // These were collected by the drawer but never reached the checker,
+        // so #11/#12/#14/#18 could not fire at all — most visibly, a Lab
+        // Coordinator could be booked into two labs at once in silence.
+        section: sectionLabel,
+        labCoordinatorId: secondPersonId || undefined,
+        basket: entry?.basket,
+        subjectId: subjectId || undefined,
+        // #6/#10/#15 only apply to labs, so the checker needs the entry type.
+        type: isLab ? "lab" : isElective ? "elective" : "regular",
+      },
       allEntries,
       sectionStudentCount,
       rooms,
       labs,
+      faculty,
+      baskets,
+      coordinators,
     });
-  }, [entry, day, period, periodEnd, facultyId, facultyName, room, allEntries, sectionStudentCount, rooms, labs]);
+  }, [
+    entry,
+    day,
+    period,
+    periodEnd,
+    facultyId,
+    facultyName,
+    room,
+    sectionLabel,
+    secondPersonId,
+    subjectId,
+    allEntries,
+    sectionStudentCount,
+    rooms,
+    labs,
+    faculty,
+    baskets,
+    coordinators,
+    isLab,
+    isElective,
+  ]);
 
   const hasBlocking = conflicts.some((c) => c.severity === "blocking");
+  // Informational deliberately absent from both gates (§1.3): it is "shown,
+  // not gated", so it must neither block the save nor demand the
+  // accept-warnings acknowledgement.
   const hasWarning = conflicts.some((c) => c.severity === "warning");
   const hasSelection = isLab ? !!facultyId && !!room : !!subjectId && !!facultyId && !!room;
   const canSave = !readOnly && hasSelection && !hasBlocking && (!hasWarning || acceptWarnings);
@@ -312,7 +364,7 @@ export function CellEditDrawer({
           {!readOnly && conflicts.length > 0 && (
             <div className="space-y-2">
               {conflicts.map((c, i) => (
-                <ConflictBadge key={i} conflict={c} />
+                <ConflictBadge key={i} conflict={c} onNavigate={onNavigateToEntry} />
               ))}
               {hasWarning && !hasBlocking && (
                 <div className="flex items-center gap-2">

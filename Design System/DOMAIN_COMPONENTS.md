@@ -40,6 +40,18 @@ Every component here references generic components from `COMPONENTS.md` where re
 >
 > **The element type follows the behaviour**, deliberately: with no destination the pill renders as a plain `<span>`, not a disabled-looking button. A pill that looks clickable and does nothing is the exact dead-click this resolved — it was reported as a bug ("I can't click the draft button") precisely because a status badge read as an affordance.
 >
+> ### ⚠️ Superseded in the design 2026-08-01 — the empty state *is* a destination
+>
+> Prakash: *"the draft button has no functionality — add a screen, show an empty draft page … if there are no drafts show something like currently there are no drafts."*
+>
+> The rule above solved the dead-click by **removing the affordance**. The screen now added solves it the other way, by **giving the affordance somewhere to land**: `Admin — Draft history (empty)` (Figma `548:11261`) says *"No drafts yet — currently there are no drafts. A draft is kept here once HOD reviews a version and you regenerate, so you can compare them."*
+>
+> That is a better answer to the same problem. "Nothing here yet, and here's what will put something here" teaches the feature; a pill that inertly stops being a button teaches nothing, and leaves the user wondering whether it's broken or they lack permission. It is only a dead click if the destination is *empty of meaning*, not empty of rows.
+>
+> **Consequence: the pill's interactive condition widens.** It should be clickable whenever draft history is *reachable* — i.e. not mid-review (Pending/Approved) — rather than only when `archivedDrafts.length > 0`. The mid-review exclusion stays: there the panel genuinely cannot be acted on.
+>
+> ✅ **Built in the frontend 2026-08-01.** `useCanManageDrafts` became `useCanOpenDraftHistory` — the rename is the point, since "manage" implied there was something to manage and that assumption *was* the bug. It no longer requires `archivedDrafts.length > 0`; the panel renders its empty state instead of disappearing. Verified in the browser with zero drafts: the top-bar pill is a real `<button aria-label="View draft history">`, and clicking it scrolls the panel into view (988px → 316px).
+>
 > The Pending-Approval → preview link suggested above is **not built** — there is no separate "what was sent" preview screen; the Approval Detail view already serves that purpose for HOD.
 >
 > **In Figma (`90:57`), 2026-08-01:** the variant set gained an `Interactive` boolean, taking it to **20 variants** (5 States × 2 Sizes × 2 Interactive). `Interactive=true` underlines the label — the same delta as the code's `hover:underline`. The matrix is deliberately **complete rather than scoped to the states that can actually be clickable** (realistically only Draft and Published, and only at `default` size): an incomplete variant set trips Figma's "missing combinations" warning and makes the component awkward to pick from, and a filled cell costs nothing but documents the treatment if the interactive rule ever widens.
@@ -342,6 +354,20 @@ Periods are **60 minutes**. There is no mid-morning break.
 - Inline (used within Cell Edit Drawer next to specific fields — 24px height)
 - Overlay (used on Cell surface in the grid — 20px diameter, positioned top-right corner)
 - Summary (used in the Post-Generation Summary Panel — full-width row-height row)
+
+> ### 9.1 The "View" link — added 2026-08-01
+>
+> When a conflict names a **specific colliding entry**, the Inline badge carries a second line: **`View {section} · {day} P{period} →`**, which navigates the grid *and* the drawer to that entry.
+>
+> **Why it is not optional.** The Timetable Grid renders one section at a time (§5's own note on why a day×period matrix is inherently per-section). So a cross-section collision — the most common kind — names a cell the user **cannot currently see**. *"Prof. Iyer is already teaching Operating Systems (3B)"* with no route to 3B is the same dead end that `PATTERNS.md` Pattern 9.3b was written to prevent for deletion, and the same rule applies: **the exit from a block is a route onward, not dismissal.**
+>
+> **Only when there is somewhere to go.** Conflicts about the cell itself — capacity (#7), unqualified faculty (#18) — name no other entry and render **no link**. A link that resolves to nothing is worse than none.
+>
+> **This replaced a false affordance.** The badge previously ended in a button labelled *"View"* that only expanded the truncated message — it said View and viewed nothing, sitting next to a message about an unreachable cell. The message now wraps, and *View* means what it says.
+>
+> **Electives resolve via contributing sections.** An elective entry's `section` is its *basket* label ("Basket A"), which matches no section in the picker. The link falls back to the basket's contributing `sections`, otherwise it would silently fail on exactly the cross-section case it exists for.
+>
+> **Leaving mid-edit discards the pending edit, without a confirmation.** This is deliberate and safe: the link only appears on a conflict, and a *blocking* one cannot be saved anyway — there was never a candidate edit to preserve.
 
 **Anatomy (Inline size):**
 - Severity icon (left, 16px)

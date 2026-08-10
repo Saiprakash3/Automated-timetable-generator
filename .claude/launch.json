@@ -8,10 +8,19 @@
       "port": 5173
     },
     {
-      "name": "mock-backend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "Backend/mock-backend", "start"],
-      "port": 4000
+      "name": "backend",
+      "runtimeExecutable": "Backend/fastapi-backend/venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--reload",
+        "--port",
+        "8000",
+        "--app-dir",
+        "Backend/fastapi-backend"
+      ],
+      "port": 8000
     }
   ]
 }

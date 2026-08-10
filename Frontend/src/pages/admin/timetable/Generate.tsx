@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { Lock, TriangleAlert, Trash2 } from "lucide-react";
+import { Lock, TriangleAlert, Trash2, Clock } from "lucide-react";
 import { StatusPill } from "@/components/domain/StatusPill";
 import { Button } from "@/components/ui/button";
 import { TimetableGrid } from "@/components/domain/TimetableGrid";
@@ -11,21 +11,14 @@ import { DeleteDraftDialog } from "@/components/domain/DeleteDraftDialog";
 import {
   useTimetableData,
   useArchivedDrafts,
-  useCanManageDrafts,
+  useCanOpenDraftHistory,
   setGeneratedTimetable,
   DRAFTS_ANCHOR,
   scrollToDrafts,
 } from "@/hooks/useTimetableData";
 import { useSetupCategories, getSetupSummary } from "@/lib/setupCategories";
-import { generateTimetable } from "@/lib/generateTimetable";
-import { useSubjectData } from "@/hooks/useSubjectData";
+import { resolveConflictTarget, type ConflictTarget } from "@/lib/resolveConflictTarget";
 import { useSectionData } from "@/hooks/useSectionData";
-import { useFacultyData } from "@/hooks/useFacultyData";
-import { useRoomData } from "@/hooks/useRoomData";
-import { useLabData } from "@/hooks/useLabData";
-import { useLabCoordinatorData } from "@/hooks/useLabCoordinatorData";
-import { useSubjectFacultyMappingData } from "@/hooks/useSubjectFacultyMappingData";
-import { useElectiveBasketData } from "@/hooks/useElectiveBasketData";
 import { SendForApprovalDialog } from "./SendForApprovalDialog";
 import { PublishDialog } from "./PublishDialog";
 import { ReviewNote } from "@/components/domain/ReviewNote";
@@ -63,26 +56,27 @@ const announcedRejections = new Set<string>();
 export default function TimetableGenerate() {
   const timetable = useTimetableData();
   const archivedDrafts = useArchivedDrafts();
-  const canManageDrafts = useCanManageDrafts();
+  const canOpenDraftHistory = useCanOpenDraftHistory();
   const categories = useSetupCategories();
-  const { completed, total } = getSetupSummary(categories);
+  const { completed, total, loading: setupLoading } = getSetupSummary(categories);
   const setupComplete = completed === total;
 
-  const subjects = useSubjectData();
+  // Only sections is still read here — it drives the grid's section picker.
+  // The rest of the setup data used to be gathered to feed the client-side
+  // solver fallback; generation is now the backend's job, so the page no
+  // longer needs its own copy of the whole setup dataset.
   const sections = useSectionData();
-  const faculty = useFacultyData();
-  const rooms = useRoomData();
-  const labs = useLabData();
-  const coordinators = useLabCoordinatorData();
-  const mappings = useSubjectFacultyMappingData();
-  const baskets = useElectiveBasketData();
 
   const [generating, setGenerating] = useState(false);
   const [loadingApi, setLoadingApi] = useState(true);
   const [summaryDismissed, setSummaryDismissed] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
-  const [selectedSectionId, setSelectedSectionId] = useState(sections[0]?.id ?? "");
+  // Starts empty and is resolved below, once both the sections list and the
+  // timetable have loaded. Seeding it with `sections[0]` meant the picker
+  // opened on "Year 2 — A" while the loaded timetable was 3A, so the grid
+  // showed an almost-empty week and looked broken.
+  const [selectedSectionId, setSelectedSectionId] = useState("");
   const [view, setView] = useState<GridView>("week");
   const [selectedDay, setSelectedDay] = useState("Monday");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -90,6 +84,21 @@ export default function TimetableGenerate() {
     null,
   );
   const [deleteDraftId, setDeleteDraftId] = useState<string | null>(null);
+
+  // Point the grid at the section the timetable is actually for. Entries carry
+  // a `section` label like "3A"; match it back to a Section record. Falls back
+  // to the first section only when nothing matches (e.g. entries with no
+  // section, as the API's own rows have).
+  const entrySectionLabel = timetable?.entries.find((e) => e.section)?.section;
+  useEffect(() => {
+    // `loadingApi` gate matters: sections and the timetable load from separate
+    // requests. Without it, sections usually won the race, the label was still
+    // undefined, and this defaulted to sections[0] — then refused to correct
+    // itself because selectedSectionId was set.
+    if (loadingApi || selectedSectionId || sections.length === 0) return;
+    const match = sections.find((s) => `${s.year}${s.name}` === entrySectionLabel);
+    setSelectedSectionId((match ?? sections[0]).id);
+  }, [loadingApi, selectedSectionId, sections, entrySectionLabel]);
 
   const changesRequestedAt = timetable?.changesRequestedAt;
   useEffect(() => {
@@ -113,8 +122,17 @@ export default function TimetableGenerate() {
       .list()
       .then(async (res) => {
         if (isMounted && res.timetables && res.timetables.length > 0) {
-          // Get details of the first timetable found (or active one)
-          const detail = await timetablesApi.get(res.timetables[0].id);
+          // Pick the most recently touched timetable, not `[0]`. The list
+          // endpoint has no defined ordering, so indexing into it showed a
+          // different timetable on different loads — a Draft one moment and a
+          // locked Pending one the next, which reads as the lifecycle randomly
+          // changing. Newest-updated is also what "the timetable I'm working
+          // on" means right after a Generate/Regenerate.
+          const newest = [...res.timetables].sort(
+            (a, b) =>
+              new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime(),
+          )[0];
+          const detail = await timetablesApi.get(newest.id);
           if (isMounted && detail) {
             setGeneratedTimetable({
               id: detail.id,
@@ -126,7 +144,15 @@ export default function TimetableGenerate() {
                 gaps: 0,
                 adjustedByRepair: 0,
               },
-              entries: detail.entries as unknown as TimetableEntry[],
+              // `timetable_entries` has no `section` column — a timetable is
+              // per-(department, year, section), so the section lives on the
+              // parent row. Without stamping it here every entry arrives
+              // section-less, which made the grid's section filter match
+              // nothing and the picker default to the wrong section.
+              entries: (detail.entries as unknown as TimetableEntry[]).map((e) => ({
+                ...e,
+                section: e.section || `${detail.year}${detail.section}`,
+              })),
               approvedBy: detail.approvedBy || undefined,
               publishedAt: detail.publishedAt || undefined,
             });
@@ -145,37 +171,63 @@ export default function TimetableGenerate() {
     };
   }, []);
 
-  async function handleGenerate() {
-    setGenerating(true);
-    try {
-      const data = await timetablesApi.generate("CSE", 3, "A");
-      if (data) {
-        setGeneratedTimetable({
-          id: data.id,
-          status: (data.state || "draft") as WorkflowState,
-          generatedAt: data.createdAt,
-          summary: {
-            totalNeeded: data.entries?.length || 0,
-            placed: data.entries?.length || 0,
-            gaps: 0,
-            adjustedByRepair: 0,
-          },
-          entries: (data.entries || []) as unknown as TimetableEntry[],
-        });
-        setSummaryDismissed(false);
-        setGenerating(false);
-        return;
-      }
-    } catch (err) {
-      console.warn("Backend generation failed, falling back to local solver:", err);
+  /**
+   * Jump the grid and the drawer to the entry a conflict names. Nothing is
+   * lost by leaving: this only appears on a conflict, and a *blocking* one
+   * cannot be saved anyway — the pending edit was never a candidate to keep.
+   *
+   * An elective's `section` is its basket label ("Basket A"), which matches no
+   * section in the picker, so fall back to the first contributing section —
+   * otherwise the link would silently do nothing on exactly the cross-section
+   * case it exists for.
+   */
+  function handleNavigateToConflict(target: ConflictTarget) {
+    const resolved = resolveConflictTarget(target, timetable?.entries ?? [], sections);
+
+    if (!resolved) {
+      toast.error("Can't open that entry.", {
+        description: `${target.section} isn't one of the sections available here.`,
+      });
+      return;
     }
 
-    setTimeout(() => {
-      const result = generateTimetable({ subjects, sections, faculty, rooms, labs, coordinators, mappings, baskets });
-      setGeneratedTimetable(result);
+    setSelectedSectionId(resolved.section.id);
+    if (view === "day") setSelectedDay(target.day);
+    setDrawerCell({ day: target.day, period: target.periodStart, entry: resolved.entry });
+    setDrawerOpen(true);
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    // The backend solver is authoritative. There used to be a fall-through to
+    // the client-side generateTimetable() here, which meant a failed API call
+    // silently produced a locally-invented timetable that was never persisted
+    // — indistinguishable on screen from a real one, and gone on reload. A
+    // generation failure has to read as a failure.
+    try {
+      const data = await timetablesApi.generate("CSE", 3, "A");
+      if (!data) throw new Error("Generation returned no timetable");
+      setGeneratedTimetable({
+        id: data.id,
+        status: (data.state || "draft") as WorkflowState,
+        generatedAt: data.createdAt,
+        summary: {
+          totalNeeded: data.entries?.length || 0,
+          placed: data.entries?.length || 0,
+          gaps: 0,
+          adjustedByRepair: 0,
+        },
+        entries: (data.entries || []) as unknown as TimetableEntry[],
+      });
       setSummaryDismissed(false);
+    } catch (err) {
+      console.error("Timetable generation failed:", err);
+      toast.error("Couldn't generate the timetable.", {
+        description: "The backend didn't return a schedule. Check it's running, then retry.",
+      });
+    } finally {
       setGenerating(false);
-    }, 400);
+    }
   }
 
   if (loadingApi) {
@@ -189,12 +241,17 @@ export default function TimetableGenerate() {
         <div className="space-y-1">
           <h1 className="font-heading text-h1 font-semibold text-foreground">No timetable yet</h1>
           <p className="font-body text-muted-foreground">
-            {setupComplete
-              ? "All setup categories are complete — ready to generate."
-              : `Complete all 9 setup categories before generating (${completed} of ${total} done).`}
+            {setupLoading
+              ? "Checking setup…"
+              : setupComplete
+                ? "All setup categories are complete — ready to generate."
+                : `Complete all ${total} setup categories before generating (${completed} of ${total} done).`}
           </p>
         </div>
-        <Button size="lg" onClick={handleGenerate} disabled={!setupComplete || generating}>
+        {/* Gated on `setupLoading` too: the categories load async, so without
+            it this button sat disabled with "0 of 9 done" on every visit until
+            the fetches landed — on a fully-configured install. */}
+        <Button size="lg" onClick={handleGenerate} disabled={setupLoading || !setupComplete || generating}>
           {generating ? "Generating…" : "Generate Timetable"}
         </Button>
       </div>
@@ -220,10 +277,26 @@ export default function TimetableGenerate() {
           <StatusPill
             state={timetable.status}
             publishedAt={timetable.publishedAt ? new Date(timetable.publishedAt).toLocaleString() : undefined}
-            onClick={canManageDrafts ? scrollToDrafts : undefined}
-            actionLabel={canManageDrafts ? "View draft history" : undefined}
+            onClick={canOpenDraftHistory ? scrollToDrafts : undefined}
+            actionLabel={canOpenDraftHistory ? "View draft history" : undefined}
           />
+          {/* Figma puts the lifecycle actions here, secondary-then-primary:
+              Draft `120:328` is [Regenerate][Send for approval], Approved
+              `130:1647` is [Regenerate][Publish]. Regenerate used to live only
+              inside the Post-Generation Summary Panel, which meant clicking
+              "Review Grid" dismissed the panel and took Regenerate with it —
+              leaving no way to regenerate at all until reload. */}
           <div className="flex gap-2 print:hidden">
+            {(isDraft || isApproved) && (
+              <Button
+                variant="secondary"
+                onClick={handleGenerate}
+                disabled={generating || isApproved}
+                title={isApproved ? "Approved timetables can't be regenerated — that would discard HOD approval." : undefined}
+              >
+                {generating ? "Regenerating…" : "Regenerate"}
+              </Button>
+            )}
             {isDraft && <Button onClick={() => setSendDialogOpen(true)}>Send for Approval</Button>}
             {isApproved && <Button onClick={() => setPublishDialogOpen(true)}>Publish</Button>}
           </div>
@@ -283,13 +356,15 @@ export default function TimetableGenerate() {
               the repair pass
             </p>
           )}
-          <div className="flex gap-2 print:hidden">
+          {/* Only Review Grid here. Figma `120:328` does show [Regenerate]
+              [Review Grid] in this panel, but that panel is a rich one — gaps
+              list, conflicts-by-severity — where a panel-scoped Regenerate
+              reads as "these results are bad, redo them". Ours renders a
+              single success line, so a second Regenerate sat ~150px from the
+              header's own and just read as duplication. Header wins because it
+              survives dismissing this panel; deliberate deviation from Figma. */}
+          <div className="flex justify-end gap-2 print:hidden">
             <Button onClick={() => setSummaryDismissed(true)}>Review Grid</Button>
-            {isDraft && (
-              <Button variant="secondary" onClick={handleGenerate} disabled={generating}>
-                {generating ? "Regenerating…" : "Regenerate"}
-              </Button>
-            )}
           </div>
         </div>
       )}
@@ -327,28 +402,46 @@ export default function TimetableGenerate() {
         );
       })()}
 
-      {!isPending && !isApproved && archivedDrafts.length > 0 && (
+      {/* Renders whenever draft history is reachable, empty or not. It used to
+          require `archivedDrafts.length > 0`, so the Status Pill's own
+          destination silently didn't exist until a draft had been archived —
+          the pill pointed at nothing. PATTERNS.md §8.4 / Figma `548:11261`. */}
+      {canOpenDraftHistory && (
         <div id={DRAFTS_ANCHOR} className="space-y-3 rounded-lg border border-border p-4 print:hidden">
-          <h2 className="font-heading text-h3 font-semibold text-foreground">Manage drafts</h2>
+          <h2 className="font-heading text-h3 font-semibold text-foreground">Draft history</h2>
           <p className="font-body text-sm text-muted-foreground">
             Past drafts HOD has already reviewed, kept for comparison. Deleting one removes it permanently.
           </p>
-          <ul className="space-y-2">
-            {archivedDrafts.map((draft) => (
-              <li
-                key={draft.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
-              >
-                <span className="font-body text-sm text-foreground">
-                  Draft {draft.draftNumber} — {new Date(draft.generatedAt).toLocaleString()}
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => setDeleteDraftId(draft.id)}>
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  Delete
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {archivedDrafts.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-md border border-border px-4 py-8 text-center">
+              <Clock className="size-8 text-muted-foreground" aria-hidden="true" />
+              <p className="font-heading text-h3 font-semibold text-foreground">No drafts yet</p>
+              {/* Names what will populate it, not just that it's empty — "No
+                  drafts yet" alone leaves the user unsure whether the feature
+                  is broken, not permitted, or merely unused. */}
+              <p className="max-w-md font-body text-sm text-muted-foreground">
+                Currently there are no drafts. A draft is kept here once HOD reviews a version and you regenerate, so
+                you can compare them.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {archivedDrafts.map((draft) => (
+                <li
+                  key={draft.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                >
+                  <span className="font-body text-sm text-foreground">
+                    Draft {draft.draftNumber} — {new Date(draft.generatedAt).toLocaleString()}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setDeleteDraftId(draft.id)}>
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    Delete
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -380,6 +473,7 @@ export default function TimetableGenerate() {
               sectionLabel={section ? `${section.year}${section.name}` : ""}
               sectionStudentCount={section?.studentCount}
               allEntries={timetable.entries}
+              onNavigateToEntry={handleNavigateToConflict}
             />
           );
         })()}

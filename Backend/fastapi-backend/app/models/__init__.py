@@ -11,6 +11,9 @@ from app.models.setup_models import (
     LabModel,
     SectionModel,
     SubjectFacultyMappingModel,
+    LabCoordinatorModel,
+    ElectiveBasketModel,
+    ElectiveModel,
 )
 
 __all__ = [
@@ -25,4 +28,7 @@ __all__ = [
     "LabModel",
     "SectionModel",
     "SubjectFacultyMappingModel",
+    "LabCoordinatorModel",
+    "ElectiveBasketModel",
+    "ElectiveModel",
 ]

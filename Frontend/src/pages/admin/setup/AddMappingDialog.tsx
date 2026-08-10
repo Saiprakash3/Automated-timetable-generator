@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { addMapping } from "@/hooks/useSubjectFacultyMappingData";
+import { addMapping, updateMapping } from "@/hooks/useSubjectFacultyMappingData";
+import type { SubjectFacultyMapping } from "@/types";
 import { useSubjectData } from "@/hooks/useSubjectData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFacultyData } from "@/hooks/useFacultyData";
@@ -11,13 +12,15 @@ import { useFacultyData } from "@/hooks/useFacultyData";
 interface AddMappingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Edit mode when set: same form, pre-filled (PATTERNS.md Pattern 9.2). */
+  editing?: SubjectFacultyMapping | null;
 }
 
 /** Three live-joined Selects, no free text — a mapping is only meaningful as
  *  a link between existing records. Subject options exclude electives:
  *  PROJECT_BRIEF.md scopes electives to cross-section basket assignment
  *  (Elective Baskets' job), not a per-section mapping like this one. */
-export function AddMappingDialog({ open, onOpenChange }: AddMappingDialogProps) {
+export function AddMappingDialog({ open, onOpenChange, editing }: AddMappingDialogProps) {
   const subjects = useSubjectData().filter((s) => s.type !== "elective");
   const sections = useSectionData();
   const faculty = useFacultyData();
@@ -34,10 +37,23 @@ export function AddMappingDialog({ open, onOpenChange }: AddMappingDialogProps) 
 
   const isValid = subjectId !== "" && sectionId !== "" && facultyId !== "";
 
+  const isEdit = !!editing;
+
+  // Pre-fill on open. A blank 'edit' form is just a second Add form:
+  // you can't see what you're correcting, and untouched fields blank out.
+  useEffect(() => {
+    if (!open) return;
+    setSubjectId(editing?.subjectId ?? "");
+    setSectionId(editing?.sectionId ?? "");
+    setFacultyId(editing?.facultyId ?? "");
+  }, [open, editing]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid) return;
-    addMapping({ subjectId, sectionId, facultyId });
+    const record = { subjectId, sectionId, facultyId };
+    if (editing) void updateMapping(editing.id, record);
+    else void addMapping(record);
     reset();
     onOpenChange(false);
   }
@@ -52,7 +68,7 @@ export function AddMappingDialog({ open, onOpenChange }: AddMappingDialogProps) 
     >
       <DialogContent className="rounded-lg sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add mapping</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit mapping" : "Add mapping"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -109,7 +125,7 @@ export function AddMappingDialog({ open, onOpenChange }: AddMappingDialogProps) 
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid}>
-              Add mapping
+              {isEdit ? "Save changes" : "Add mapping"}
             </Button>
           </DialogFooter>
         </form>

@@ -13,7 +13,9 @@ from app.services.workflow_service import WorkflowService
 from app.api.dependencies import get_current_user, get_current_admin, get_current_hod
 from app.models import User
 
-from app.services.generation_service import TimetableGeneratorService
+from app.services.generation_service import TimetableGeneratorService, GenerationError
+from app.services.conflict_service import ConflictService
+from app.config import settings
 
 router = APIRouter(prefix="/api/timetables", tags=["timetables"])
 
@@ -23,9 +25,27 @@ async def generate_timetable(
     department: str = Query("CSE"),
     year: int = Query(3),
     section: str = Query("A"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
 ):
-    """Generate a timetable using backend constraint solver"""
-    return TimetableGeneratorService.generate(department=department, year=year, section=section)
+    """Generate a timetable from the Setup data and persist it.
+
+    Previously took neither a db session nor an authenticated user — it was the
+    only mutating endpoint in the API with no auth, and it could not read Setup
+    or save its result.
+    """
+    try:
+        return TimetableGeneratorService.generate(
+            db=db,
+            created_by=current_user.id,
+            department=department,
+            year=year,
+            section=section,
+        )
+    except GenerationError as exc:
+        # A Setup gap is the caller's problem to fix, not a server fault — 422
+        # so the UI can show the specific missing category.
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
 @router.get("")
@@ -112,11 +132,51 @@ async def update_timetable(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
-    """Update timetable entries (Admin only)"""
+    """Update timetable entries (Admin only).
+
+    Blocking conflicts are rejected here. Until 2026-08-01 this endpoint wrote
+    whatever it was given: `ConflictService` existed but nothing ever called it,
+    so the only enforcement in the system was the browser's own check — which
+    meant the API happily accepted a double-booked room from any other client,
+    or from a stale tab. The client-side check stays for live feedback in the
+    drawer; this is the boundary that actually holds.
+    """
     try:
+        # ConflictService reads camelCase (`periodStart`), the request schema is
+        # snake_case (`period_start`). Handing it model_dump() directly would
+        # give it keys it never looks at, so every check would quietly find
+        # nothing and pass — enforcement that exists but can't fail.
+        proposed = []
+        for e in request.entries or []:
+            d = e.model_dump() if hasattr(e, "model_dump") else dict(e)
+            proposed.append(
+                {
+                    **d,
+                    "periodStart": d.get("period_start"),
+                    "periodEnd": d.get("period_end"),
+                    "facultyId": d.get("faculty_id"),
+                    "facultyName": d.get("faculty_name"),
+                }
+            )
+        if proposed:
+            report = ConflictService.check_conflicts(db, timetable_id, proposed, settings)
+            blocking = [c for c in report["conflicts"] if c["severity"] == "blocking"]
+            if blocking:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "BLOCKING_CONFLICTS",
+                        "message": f"{len(blocking)} blocking conflict{'s' if len(blocking) != 1 else ''} would be created.",
+                        "conflicts": blocking,
+                    },
+                )
+
         TimetableService.update_timetable_entries(db, timetable_id, request)
         result = TimetableService.get_timetable_with_entries(db, timetable_id)
         return result
+
+    except HTTPException:
+        raise
 
     except ValueError as e:
         if str(e) == "NOT_FOUND":

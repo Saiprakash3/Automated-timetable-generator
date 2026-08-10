@@ -2,9 +2,11 @@ import { useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useFacultyData, addFaculty } from "@/hooks/useFacultyData";
+import { useFacultyData, addFaculty, removeFaculty } from "@/hooks/useFacultyData";
 import { useSubjectFacultyMappingData } from "@/hooks/useSubjectFacultyMappingData";
 import { AddFacultyDialog } from "./AddFacultyDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
 import { BulkImportStepper, type BulkImportColumn } from "@/components/domain/BulkImportStepper";
 import type { Faculty } from "@/types";
 
@@ -37,6 +39,8 @@ export default function FacultySetup() {
   const mappings = useSubjectFacultyMappingData();
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState<Faculty | null>(null);
+  const [deleting, setDeleting] = useState<Faculty | null>(null);
 
   /** Distinct sections a faculty member teaches, joined from Subject–Faculty
    *  Mapping rather than a stored count — see types/faculty.ts's note. */
@@ -63,7 +67,15 @@ export default function FacultySetup() {
       }
       canServeAsLabCoordinator = normalized === "true";
     }
-    const data: Omit<Faculty, "id"> = { name: name.trim(), department: department.trim(), canServeAsLabCoordinator };
+    // Bulk import has no qualification column — an empty list reads as
+    // "unrestricted" (INTERACTION_DECISIONS.md §13), so imported staff simply
+    // aren't subject to conflict #18 until Admin records what they teach.
+    const data: Omit<Faculty, "id"> = {
+      name: name.trim(),
+      department: department.trim(),
+      canServeAsLabCoordinator,
+      canTeachSubjectIds: [],
+    };
     return { valid: true as const, data };
   }
 
@@ -107,6 +119,7 @@ export default function FacultySetup() {
                 <TableHead>Faculty</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead className="text-right">Sections</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -115,6 +128,16 @@ export default function FacultySetup() {
                   <TableCell className="font-medium text-foreground">{f.name}</TableCell>
                   <TableCell className="text-muted-foreground">{f.department}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{sectionsFor(f.id)}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={f.name}
+                      onEdit={() => {
+                        setEditing(f);
+                        setAddOpen(true);
+                      }}
+                      onDelete={() => setDeleting(f)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -122,7 +145,23 @@ export default function FacultySetup() {
         </div>
       )}
 
-      <AddFacultyDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddFacultyDialog
+        open={addOpen}
+        onOpenChange={(next) => {
+          setAddOpen(next);
+          // Clear the edit target on close, so the next "Add faculty" opens a
+          // blank form rather than silently editing the last row touched.
+          if (!next) setEditing(null);
+        }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting?.name ?? ""}
+        categoryLabel="faculty list"
+        onConfirm={() => removeFaculty(deleting!.id)}
+      />
       <BulkImportStepper<Faculty>
         open={importOpen}
         onOpenChange={setImportOpen}

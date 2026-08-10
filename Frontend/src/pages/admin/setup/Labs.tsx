@@ -3,8 +3,11 @@ import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useLabData } from "@/hooks/useLabData";
+import { useLabData, removeLab } from "@/hooks/useLabData";
 import { AddLabDialog } from "./AddLabDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { Lab } from "@/types";
 
 /** Same structure as Faculty/Subjects/Rooms — see Faculty.tsx's notes on the
  *  omitted checkbox column and the disabled Import button; both apply here too.
@@ -13,6 +16,8 @@ import { AddLabDialog } from "./AddLabDialog";
 export default function LabsSetup() {
   const labs = useLabData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Lab | null>(null);
+  const [deleting, setDeleting] = useState<Lab | null>(null);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -56,6 +61,7 @@ export default function LabsSetup() {
                 <TableHead className="text-right">Capacity</TableHead>
                 <TableHead>Equipment</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -72,6 +78,13 @@ export default function LabsSetup() {
                       <Badge className="border-transparent bg-warning-bg text-warning-fg">Under maintenance</Badge>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={l.name}
+                      onEdit={() => { setEditing(l); setAddOpen(true); }}
+                      onDelete={() => setDeleting(l)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -79,7 +92,18 @@ export default function LabsSetup() {
         </div>
       )}
 
-      <AddLabDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddLabDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? deleting.name : ""}
+        categoryLabel="lab list"
+        onConfirm={() => removeLab(deleting!.id)}
+      />
     </div>
   );
 }

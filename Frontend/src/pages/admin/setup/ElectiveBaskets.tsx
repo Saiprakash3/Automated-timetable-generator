@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useElectiveBasketData } from "@/hooks/useElectiveBasketData";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import { useElectiveBasketData, removeElectiveBasket } from "@/hooks/useElectiveBasketData";
+import type { ElectiveBasket } from "@/types";
 import { useSubjectData } from "@/hooks/useSubjectData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { TIME_SLOTS } from "@/lib/timeSlots";
@@ -19,6 +23,7 @@ const YEARS = [3, 4];
 export default function ElectiveBasketsSetup() {
   const navigate = useNavigate();
   const baskets = useElectiveBasketData();
+  const [deleting, setDeleting] = useState<ElectiveBasket | null>(null);
   const subjects = useSubjectData();
   const sections = useSectionData();
 
@@ -57,9 +62,19 @@ export default function ElectiveBasketsSetup() {
               <div className="space-y-3">
                 {yearBaskets.map((b) => (
                   <div key={b.id} className="rounded-lg border border-border p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <span className="font-medium text-foreground">{b.name}</span>
-                      <span className="font-body text-sm text-muted-foreground">{periodLabel(b.period)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-body text-sm text-muted-foreground">{periodLabel(b.period)}</span>
+                        {/* Edit reopens the basket's own config screen rather
+                            than a dialog — the nested elective list is why this
+                            category has a full page in the first place. */}
+                        <RowActions
+                          label={b.name}
+                          onEdit={() => navigate(`/setup/elective-baskets/${b.id}/edit`)}
+                          onDelete={() => setDeleting(b)}
+                        />
+                      </div>
                     </div>
                     <p className="font-body text-sm text-muted-foreground">
                       Sections: {b.sectionIds.map(sectionName).join(", ")}
@@ -74,6 +89,14 @@ export default function ElectiveBasketsSetup() {
           </div>
         );
       })}
+
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting?.name ?? ""}
+        categoryLabel="elective baskets"
+        onConfirm={() => removeElectiveBasket(deleting!.id)}
+      />
     </div>
   );
 }

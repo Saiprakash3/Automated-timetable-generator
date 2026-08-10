@@ -418,6 +418,14 @@ Reference: `USER_FLOWS.md` F-01, F-02, F-03, F-05, F-06
 - [ ] **Subject–Faculty Mapping** screen
 - [ ] **Elective Baskets** screen (see F-06 for the specific configuration flow)
 - [ ] **Add Single Record modal** (used by each setup screen — one component instance)
+- [x] **Edit Single Record modal** ✅ Built 2026-08-01 — screen `522:11234`. Same Dialog as Add, **pre-filled** with the record's current values; title `Edit subject`, confirm `Save changes` (`PATTERNS.md` Pattern 9.2).
+- [x] **Remove Record confirmation (setup)** ✅ Built 2026-08-01 — screen `523:11413`. Destructive Confirmation Dialog on a Setup background. Reached only when the record has **no live dependents** (Pattern 9.3a).
+- [x] **Remove blocked — record in use** ✅ Built 2026-08-01 — screen `529:10812`. Reversible (info) Confirmation Dialog listing each dependent with identifying detail, primary action navigates to it (Pattern 9.3b). This is the other half of the "block on delete" decision — `INTERACTION_DECISIONS.md` §12.3.
+- [x] **Row actions on every editable Setup table** ✅ Built 2026-08-01 — `Table Row Actions` component `521:56` (Edit + Delete Icon Buttons, 60px column). Applied to Faculty, Subjects, Lab Coordinators, Labs, Rooms, Sections, Subject–Faculty Mapping, Elective Baskets — **41 rows across 8 screens**, plus the generic `Table` component `67:3`, whose per-row kebab menu it replaced.
+  - [x] **Time Slot Grid deliberately excluded** — `INTERACTION_DECISIONS.md` §8.1 fixes the daily schedule as a college-wide constant Admin cannot configure, so edit controls there would be a false affordance (and would let Admin delete the Lunch break that §8.2's lab rules depend on).
+- [x] **Error screens (404 / 403 / crash)** ✅ Built 2026-08-01 — `558:11582` Page not found, `558:11594` No access, `558:11604` Something went wrong. All standalone (no shell) because the routes that render them sit above every shell, and the crash fallback can't assume the shell survived. See COMPONENTS.md E.3.
+- [x] **Draft history — empty state** ✅ Built 2026-08-01 — screen `548:11261`. The Status Pill's click destination had no designed empty state, so the pill pointed at a screen that didn't exist (PATTERNS.md §8.4).
+- [x] **Elective Basket config — edit mode** ✅ Built 2026-08-01 — screen `543:11060`. Baskets don't use the shared Add dialog, so Edit reopens their own config page pre-filled: `Edit elective basket` / `Save changes` (PATTERNS.md Pattern 9.2's exception note).
 - [ ] **Bulk Import Stepper** open on each of its 4 steps
 - [ ] **Elective Basket configuration** dedicated screen (F-06 flow)
 

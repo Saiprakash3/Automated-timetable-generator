@@ -54,6 +54,11 @@ Per the 2026-07-13 decision, the conflict model is now designed to be extensible
 | 15 | No available second person for a lab in that slot | F-07 | **Informational** (surfaces a setup gap, not an edit error) |
 | 16 | **HOD assigned to a lab session** — the HOD teaches lectures and electives only (§9.2) | §9, Prakash 2026-07-17 | **Blocking** |
 | 17 | **HOD lecture count outside range** — **3–4 per day**, 15–20 per week; catches under-load *and* over-load; electives count toward the total (§9.2/§9.3) | §9, Prakash 2026-07-17 | **Warning** |
+| 18 | **Faculty not qualified to teach this subject** — the assigned subject is not in that faculty member's `canTeachSubjectIds`. See §13 for why this is a stored qualification, not derived from existing mappings | Prakash 2026-08-01 | **Warning** |
+| 19 | **Lab coordinator daily load exceeded** — `lab_coordinator_max_periods_per_day` (config, default 4) | backend, documented 2026-08-01 | **Warning** |
+| 20 | **Lab coordinator weekly load exceeded** — `lab_coordinator_max_days_per_week` (config, default 5) | backend, documented 2026-08-01 | **Informational** |
+
+> **#19 and #20 were found already implemented, not newly invented.** `conflict_service.py` has enforced both since it was written, backed by real config settings — they simply had no taxonomy entry, so the list claimed 18 rules while the code ran 20. Documented here rather than deleted: the rules are sound, it was the taxonomy that was incomplete.
 
 Items 2, 7, 8, 9, 13, and 15 are new relative to `USER_FLOWS.md` and are flagged for the backend developer as extensions to the constraint-check layer, not yet detailed at the data-model level here. **Items 16 and 17 are also new** — see §9.3 for why one is Blocking and the other Warning, and note that #17 is the first check in this taxonomy with a **floor** as well as a ceiling.
 
@@ -67,7 +72,38 @@ Three tiers, each with a distinct interaction behavior:
 
 This tiering is the single biggest addition Design System Planning makes to the interaction model established in User Flows. It will be visualized concretely (colors, iconography, message layout) in `DOMAIN_COMPONENTS.md`.
 
-### 1.4 What this does not resolve here
+### 1.4 Implementation status (audited 2026-08-01)
+
+Two layers enforce this taxonomy, deliberately:
+
+- **Client** (`lib/checkEntryConflicts.ts`) — live feedback in the Cell Edit Drawer. Blocking must keep the field open *as you type*, which a round-trip can't do.
+- **Server** (`services/conflict_service.py`, called from `PATCH /timetables/{id}`) — the boundary that actually holds. Until 2026-08-01 this service **existed but was never called**: `conflictsApi` had no call sites, so the only enforcement anywhere was the browser's, and the API would accept a double-booked room from any other client or a stale tab.
+
+| # | Client | Server | Note |
+|---|---|---|---|
+| 1 Faculty double-booking | ✅ | ✅ | |
+| 2 Faculty unavailable | ❌ | ❌ | **No availability model exists.** Needs a per-faculty unavailable-slots field — a Setup feature, not just a check. |
+| 3 Faculty overload | ✅ | ✅ | Server had the weekly half as Informational; corrected to Warning per §1.2. |
+| 4 Room double-booking | ✅ | ✅ | |
+| 5 Lab double-booking | ✅ | ✅ | Client reports it under its own code rather than folding into #4. |
+| 6 Lab under maintenance | ✅ | ❌ | Uses `Lab.available`. |
+| 7 Capacity exceeded | ✅ | ❌ | |
+| 8 Lab unsuitable for subject | ❌ | ❌ | **`equipment` is free text.** Any match would be string-guessing dressed as a rule; needs structured equipment tags. |
+| 9 Batch double-booking | ❌ | ❌ | **No Batch entity** — `batch` is a free-text label (DOMAIN_COMPONENTS.md §10). |
+| 10 Lab block invalid / crosses lunch | ✅ | ✅ | Server was Warning **and** only caught single-period labs; now Blocking, and catches the lunch straddle. |
+| 11 Section double-booked | ✅ | ❌ | |
+| 12 Basket slot collision | ✅ | ❌ | Also enforced preventively in the basket picker. |
+| 13 Elective content overlap | ✅ | ❌ | First Informational check to actually exist. |
+| 14 Second person double-booked | ✅ | ❌ | |
+| 15 No second person available | ✅ | ❌ | Informational — a Setup gap, not an edit error. |
+| 16 HOD assigned to a lab | ❌ | ❌ | **Unreachable:** the HOD is not a Faculty record, so they can't be assigned to anything. Implementing it would be dead code until that changes. |
+| 17 HOD lecture count out of range | ❌ | ❌ | Same reason as #16. |
+| 18 Faculty not qualified | ✅ | ❌ | |
+| 19/20 Coordinator load | ❌ | ✅ | |
+
+**13 of 20 enforced.** The five genuinely unimplementable ones (#2, #8, #9, #16, #17) each need a data model that doesn't exist yet — they are blocked on Setup features, not on writing the check. Nothing above is stubbed or faked to look complete.
+
+### 1.5 What this does not resolve here
 
 Exact visual treatment (color per severity, icon set), exact message copy templates, and the constraint-check function names/signatures for the new checks are deferred to `DOMAIN_COMPONENTS.md` and the backend developer's scope, respectively. This section only fixes the taxonomy and severity logic so downstream work has firm ground.
 
@@ -489,3 +525,92 @@ The HOD never needed one. F-04 step 1 has always said the **Approvals area appea
 *Evidence: Category A — confirmed by Prakash (2026-07-17).*
 
 *Evidence: Category A — confirmed by Prakash (2026-07-16).*
+
+---
+
+## 12. Setup Record Editing — and the Referential-Integrity Question It Opens
+
+### 12.1 Context
+
+Setup shipped as create-and-read only. Nine category screens could add a record; none could correct one. Reported 2026-08-01: *"there is no edit option in each step — by mistake if admin enters wrong data he should be able to edit the entry."*
+
+Deletion was in a stranger state: `PATTERNS.md` §1.1 already listed *"Removing a Faculty, Subject, Lab, Room, Section"* among its uses and supplied the confirmation copy, so the *dialog* was specified — but no screen carried a control that could open it. A specified confirmation for an unreachable action.
+
+### 12.2 Settled: both actions live in an always-visible row Actions column
+
+Edit and Delete Icon Buttons at the end of every Setup table row (`COMPONENTS.md` G.1, `PATTERNS.md` Pattern 9). Not hover-revealed — that hides them from keyboard and touch entirely. Not an overflow menu — with exactly two actions, a menu adds a click to reveal as many targets as it conceals. The generic Table component's former kebab was replaced accordingly.
+
+Edit reuses the Add Single Record dialog **pre-filled**, with `Save changes` replacing the add verb. Pre-filling is the feature: a blank "edit" form is just a second Add form, and every field left untouched would silently blank.
+
+### 12.3 Settled: removal is **blocked** while dependents exist, and the dependents are shown
+
+**Decided 2026-08-01 (Prakash): block, but show what's using it.**
+
+A Setup record is rarely standalone. Removing one may strand:
+
+| Removed record | Potentially stranded |
+|---|---|
+| Subject | Subject–Faculty mappings; electives inside a basket; **generated timetable entries** |
+| Faculty | mappings; a subject's Default Faculty; entries naming them; a lab's second person |
+| Room / Lab | entries scheduled into it; a basket elective's assigned room |
+| Section | mappings; a basket's contributing sections; an entire section's timetable |
+| Lab Coordinator | the second-person assignment on lab entries |
+
+Three models were considered. **Block** was chosen over **cascade** (removing dependents too — cleanest end state, but Pattern 1.1's one-sentence consequence cannot honestly describe a multi-table cascade, and Admin cannot see what they are destroying) and **orphan** (leave dangling references, surface as conflicts — pushes the mess into the timetable, which is where it hurts most).
+
+Block's known weakness is that it **dead-ends the user**: *"can't delete this"* with no path forward is worse than the problem it prevents. That is why the second half of the decision is not optional — **blocking without showing the dependents is not the chosen design, it is half of it.**
+
+**The blocked dialog must therefore:**
+1. Name the record and the count — *"It's still used in 2 places."*
+2. **List each dependent** with enough detail to find it — *"2 Subject–Faculty mappings · III-CSE-A, B"*, not just a number.
+3. Offer a **route to the dependent** as the primary action (*"View mappings"*), not merely a Close button. The exit from the block is navigation, not dismissal.
+
+See `PATTERNS.md` Pattern 9.3. Figma: `529:10812`.
+
+### 12.4 The published-timetable freeze — and why published entries do NOT block
+
+Block has one failure mode sharp enough to break the feature: **if a published timetable counted as a dependent, Setup would freeze for the whole term.** Every faculty member, room and subject in a live schedule is referenced, so nothing could be corrected — not even a misspelt name — until that timetable was retired. That is not an edge case; it is the normal state of the system after F-05.
+
+**Resolution: only *live configuration* blocks removal.**
+
+| Blocks removal | Does **not** block |
+|---|---|
+| Subject–Faculty mappings | Entries in a **published** timetable |
+| Electives inside a basket | Entries in an **archived** draft |
+| Lab Coordinator ↔ Lab assignments | |
+| Entries in the **current editable draft** | |
+
+The justification is that a published timetable is a **snapshot, not a live join**. Its entries already carry denormalised values (the entry stores the faculty *name* and room string alongside the id), so the published grid keeps rendering correctly after the underlying Setup record is gone. Nothing a student or teacher sees changes.
+
+> ✅ **Confirmed by Prakash 2026-08-01** — *"yes published entries shouldn't block, that's right."* The snapshot carve-out is settled: Setup stays correctable after publish.
+>
+> ⚠️ **Still open, and narrower than it looks.** Removing a record does not disturb the *current* published timetable — that is the whole point of the snapshot rule. But it does change what the **next generation** produces, and a removed Faculty cannot be re-derived. Whether that warrants escalating to Pattern 1.2 (irreversible, type-to-confirm) when the record appears in a live published schedule is undecided. The plain Destructive confirmation (9.3a) is the current behaviour.
+
+*Evidence: Category A — the missing-edit report, the block decision, and the published-snapshot carve-out are all confirmed by Prakash (2026-08-01). The Pattern 1.2 escalation question is Category D — undecided.*
+
+---
+
+## 13. Faculty Qualification — a Stored Field, Not a Derived One
+
+### 13.1 Context
+
+Reported 2026-08-01 (Prakash): *"Faculty can't be assigned with different subjects that they can't teach."* No check existed, and more importantly **no data existed to check against**.
+
+### 13.2 The distinction that decided the design
+
+Two readings were possible, and they are not the same thing:
+
+- **"Not currently assigned to it"** — derivable for free from Subject–Faculty Mapping, which already records subject + faculty + section.
+- **"Not qualified for it"** — a property of the person, independent of what they happen to be teaching this term.
+
+**Confirmed: qualification.** A mapping records a *decision already made*; a qualification records *what is permissible to decide*. Deriving one from the other collapses them, with a concrete failure: the very first time a faculty member is assigned any subject, they have no mappings at all, so a derived check would flag every legitimate first assignment as unqualified. It would also make the check circular — an assignment would justify itself.
+
+### 13.3 Settled: `Faculty.canTeachSubjectIds`
+
+A stored list of Subject ids on the Faculty record (`can_teach_subject_ids`, JSON array). Set in Setup › Faculty alongside name, department and the coordinator flag.
+
+**Severity: Warning, not Blocking** (`PATTERNS.md` §1.3's model). Blocking is reserved for *physically impossible* states — one person or room committed twice. An unqualified assignment is perfectly possible, just wrong: it is a policy/fit issue, which is exactly what the Warning tier exists for. It also leaves room for the real case where a department covers an absence with whoever is available. Admin can accept and the cell saves, marked conflicted for review.
+
+**Empty list means unrestricted, not unqualified.** Existing faculty records have no qualifications recorded, and treating an empty list as "can teach nothing" would flag every entry on every existing timetable the moment this shipped. An empty list therefore suppresses the check for that person until Admin fills it in.
+
+*Evidence: Category A — confirmed by Prakash (2026-08-01), including the qualification-vs-assignment reading and the decision to add the field.*

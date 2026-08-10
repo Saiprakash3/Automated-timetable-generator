@@ -3,9 +3,12 @@ import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useSubjectData } from "@/hooks/useSubjectData";
+import { useSubjectData, removeSubject } from "@/hooks/useSubjectData";
 import { useFacultyData } from "@/hooks/useFacultyData";
 import { AddSubjectDialog } from "./AddSubjectDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { Subject } from "@/types";
 
 const TYPE_LABEL: Record<string, string> = { regular: "Regular", lab: "Lab", elective: "Elective" };
 
@@ -15,6 +18,8 @@ export default function SubjectsSetup() {
   const subjects = useSubjectData();
   const faculty = useFacultyData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Subject | null>(null);
+  const [deleting, setDeleting] = useState<Subject | null>(null);
 
   const facultyName = (id: string) => faculty.find((f) => f.id === id)?.name ?? "—";
 
@@ -60,6 +65,7 @@ export default function SubjectsSetup() {
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Credits</TableHead>
                 <TableHead>Default Faculty</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -72,6 +78,13 @@ export default function SubjectsSetup() {
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">{s.credits}</TableCell>
                   <TableCell className="text-muted-foreground">{facultyName(s.defaultFacultyId)}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={s.name}
+                      onEdit={() => { setEditing(s); setAddOpen(true); }}
+                      onDelete={() => setDeleting(s)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -79,7 +92,18 @@ export default function SubjectsSetup() {
         </div>
       )}
 
-      <AddSubjectDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddSubjectDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? deleting.name : ""}
+        categoryLabel="subject list"
+        onConfirm={() => removeSubject(deleting!.id)}
+      />
     </div>
   );
 }

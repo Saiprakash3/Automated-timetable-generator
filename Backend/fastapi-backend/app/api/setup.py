@@ -11,7 +11,11 @@ from app.models.setup_models import (
     LabModel,
     SectionModel,
     SubjectFacultyMappingModel,
+    LabCoordinatorModel,
+    ElectiveBasketModel,
+    ElectiveModel,
 )
+from app.services.dependency_service import find_dependents, dependents_payload
 from app.schemas.setup import (
     FacultyCreate,
     FacultyResponse,
@@ -25,6 +29,10 @@ from app.schemas.setup import (
     SectionResponse,
     SubjectFacultyMappingCreate,
     SubjectFacultyMappingResponse,
+    LabCoordinatorCreate,
+    LabCoordinatorResponse,
+    ElectiveBasketCreate,
+    ElectiveBasketResponse,
 )
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
@@ -44,6 +52,7 @@ def create_faculty(data: FacultyCreate, db: Session = Depends(get_db)):
         name=data.name,
         department=data.department,
         can_serve_as_lab_coordinator=data.can_serve_as_lab_coordinator,
+        can_teach_subject_ids=data.can_teach_subject_ids,
     )
     db.add(item)
     db.commit()
@@ -56,6 +65,11 @@ def delete_faculty(faculty_id: str, db: Session = Depends(get_db)):
     item = db.query(FacultyModel).filter(FacultyModel.id == faculty_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Faculty member not found")
+    deps = find_dependents(db, "faculty", faculty_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
@@ -78,6 +92,9 @@ def create_subject(data: SubjectCreate, db: Session = Depends(get_db)):
         year=data.year,
         weekly_lectures=data.weekly_lectures,
         requires_lab=data.requires_lab,
+        credits=data.credits,
+        subject_type=data.subject_type,
+        default_faculty_id=data.default_faculty_id,
     )
     db.add(item)
     db.commit()
@@ -90,6 +107,11 @@ def delete_subject(subject_id: str, db: Session = Depends(get_db)):
     item = db.query(SubjectModel).filter(SubjectModel.id == subject_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Subject not found")
+    deps = find_dependents(db, "subjects", subject_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
@@ -122,6 +144,11 @@ def delete_room(room_id: str, db: Session = Depends(get_db)):
     item = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Room not found")
+    deps = find_dependents(db, "rooms", room_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
@@ -141,6 +168,9 @@ def create_lab(data: LabCreate, db: Session = Depends(get_db)):
         name=data.name,
         department=data.department,
         capacity=data.capacity,
+        room=data.room,
+        equipment=data.equipment,
+        available=data.available,
     )
     db.add(item)
     db.commit()
@@ -153,6 +183,11 @@ def delete_lab(lab_id: str, db: Session = Depends(get_db)):
     item = db.query(LabModel).filter(LabModel.id == lab_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Lab not found")
+    deps = find_dependents(db, "labs", lab_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
@@ -172,6 +207,7 @@ def create_section(data: SectionCreate, db: Session = Depends(get_db)):
         year=data.year,
         name=data.name,
         department=data.department,
+        student_count=data.student_count,
     )
     db.add(item)
     db.commit()
@@ -184,6 +220,11 @@ def delete_section(section_id: str, db: Session = Depends(get_db)):
     item = db.query(SectionModel).filter(SectionModel.id == section_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Section not found")
+    deps = find_dependents(db, "sections", section_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
@@ -215,6 +256,225 @@ def delete_mapping(mapping_id: str, db: Session = Depends(get_db)):
     item = db.query(SubjectFacultyMappingModel).filter(SubjectFacultyMappingModel.id == mapping_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Mapping not found")
+    deps = find_dependents(db, "mappings", mapping_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
     db.delete(item)
     db.commit()
     return None
+
+
+# --- Lab Coordinators ---
+@router.get("/lab-coordinators", response_model=List[LabCoordinatorResponse])
+def list_lab_coordinators(db: Session = Depends(get_db)):
+    return db.query(LabCoordinatorModel).all()
+
+
+@router.post(
+    "/lab-coordinators", response_model=LabCoordinatorResponse, status_code=status.HTTP_201_CREATED
+)
+def create_lab_coordinator(data: LabCoordinatorCreate, db: Session = Depends(get_db)):
+    coordinator_id = data.id or f"LC-{uuid.uuid4().hex[:8]}"
+    item = LabCoordinatorModel(
+        id=coordinator_id,
+        name=data.name,
+        department=data.department,
+        lab_ids=data.lab_ids,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/lab-coordinators/{coordinator_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_lab_coordinator(coordinator_id: str, db: Session = Depends(get_db)):
+    item = db.query(LabCoordinatorModel).filter(LabCoordinatorModel.id == coordinator_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Lab coordinator not found")
+    deps = find_dependents(db, "lab-coordinators", coordinator_id)
+    if deps:
+        # Block, and say what is using it (INTERACTION_DECISIONS.md §12.3).
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=dependents_payload(deps, getattr(item, "name", None) or item.id))
+    db.delete(item)
+    db.commit()
+    return None
+
+
+# --- Elective Baskets ---
+@router.get("/elective-baskets", response_model=List[ElectiveBasketResponse])
+def list_elective_baskets(db: Session = Depends(get_db)):
+    return db.query(ElectiveBasketModel).all()
+
+
+@router.put("/elective-baskets/{basket_id}", response_model=ElectiveBasketResponse)
+def update_elective_basket(basket_id: str, data: ElectiveBasketCreate, db: Session = Depends(get_db)):
+    item = db.query(ElectiveBasketModel).filter(ElectiveBasketModel.id == basket_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Elective basket not found")
+
+    item.name = data.name
+    item.year = data.year
+    item.period = data.period
+    item.section_ids = data.section_ids
+
+    # Electives are replaced wholesale rather than diffed. The config screen
+    # edits the basket as one document (add/remove rows, then Save), so a
+    # partial merge would have to invent an identity for rows the UI never
+    # tracked. `delete-orphan` on the relationship removes the old rows.
+    item.electives.clear()
+    db.flush()
+    for elective in data.electives:
+        item.electives.append(
+            ElectiveModel(
+                id=elective.id or f"EL-{uuid.uuid4().hex[:8]}",
+                subject_id=elective.subject_id,
+                faculty_id=elective.faculty_id,
+                room_id=elective.room_id,
+            )
+        )
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.post(
+    "/elective-baskets", response_model=ElectiveBasketResponse, status_code=status.HTTP_201_CREATED
+)
+def create_elective_basket(data: ElectiveBasketCreate, db: Session = Depends(get_db)):
+    basket_id = data.id or f"EB-{uuid.uuid4().hex[:8]}"
+    item = ElectiveBasketModel(
+        id=basket_id,
+        name=data.name,
+        year=data.year,
+        period=data.period,
+        section_ids=data.section_ids,
+    )
+    # Built through the relationship so the basket and its electives commit as
+    # one unit — a half-saved basket is worse than a rejected one.
+    for elective in data.electives:
+        item.electives.append(
+            ElectiveModel(
+                id=elective.id or f"EL-{uuid.uuid4().hex[:8]}",
+                subject_id=elective.subject_id,
+                faculty_id=elective.faculty_id,
+                room_id=elective.room_id,
+            )
+        )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/elective-baskets/{basket_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_elective_basket(basket_id: str, db: Session = Depends(get_db)):
+    item = db.query(ElectiveBasketModel).filter(ElectiveBasketModel.id == basket_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Elective basket not found")
+    # cascade="all, delete-orphan" on the relationship takes the electives too.
+    db.delete(item)
+    db.commit()
+    return None
+
+
+# --- Updates (edit an existing record) ---
+
+@router.put("/faculty/{faculty_id}", response_model=FacultyResponse)
+def update_faculty(faculty_id: str, data: FacultyCreate, db: Session = Depends(get_db)):
+    item = db.query(FacultyModel).filter(FacultyModel.id == faculty_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Faculty member not found")
+    item.name = data.name
+    item.department = data.department
+    item.can_serve_as_lab_coordinator = data.can_serve_as_lab_coordinator
+    item.can_teach_subject_ids = data.can_teach_subject_ids
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/subjects/{subject_id}", response_model=SubjectResponse)
+def update_subject(subject_id: str, data: SubjectCreate, db: Session = Depends(get_db)):
+    item = db.query(SubjectModel).filter(SubjectModel.id == subject_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    item.code = data.code
+    item.name = data.name
+    item.department = data.department
+    item.year = data.year
+    item.weekly_lectures = data.weekly_lectures
+    item.requires_lab = data.requires_lab
+    item.credits = data.credits
+    item.subject_type = data.subject_type
+    item.default_faculty_id = data.default_faculty_id
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/rooms/{room_id}", response_model=RoomResponse)
+def update_room(room_id: str, data: RoomCreate, db: Session = Depends(get_db)):
+    item = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Room not found")
+    item.room_number = data.room_number
+    item.building = data.building
+    item.capacity = data.capacity
+    item.is_lab = data.is_lab
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/labs/{lab_id}", response_model=LabResponse)
+def update_lab(lab_id: str, data: LabCreate, db: Session = Depends(get_db)):
+    item = db.query(LabModel).filter(LabModel.id == lab_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Lab not found")
+    item.name = data.name
+    item.department = data.department
+    item.capacity = data.capacity
+    item.room = data.room
+    item.equipment = data.equipment
+    item.available = data.available
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/sections/{section_id}", response_model=SectionResponse)
+def update_section(section_id: str, data: SectionCreate, db: Session = Depends(get_db)):
+    item = db.query(SectionModel).filter(SectionModel.id == section_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Section not found")
+    item.year = data.year
+    item.name = data.name
+    item.department = data.department
+    item.student_count = data.student_count
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/mappings/{mapping_id}", response_model=SubjectFacultyMappingResponse)
+def update_mapping(mapping_id: str, data: SubjectFacultyMappingCreate, db: Session = Depends(get_db)):
+    item = db.query(SubjectFacultyMappingModel).filter(SubjectFacultyMappingModel.id == mapping_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Mapping not found")
+    item.subject_id = data.subject_id
+    item.faculty_id = data.faculty_id
+    item.section_id = data.section_id
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/lab-coordinators/{coordinator_id}", response_model=LabCoordinatorResponse)
+def update_coordinator(coordinator_id: str, data: LabCoordinatorCreate, db: Session = Depends(get_db)):
+    item = db.query(LabCoordinatorModel).filter(LabCoordinatorModel.id == coordinator_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Lab coordinator not found")
+    item.name = data.name
+    item.department = data.department
+    item.lab_ids = data.lab_ids
+    db.commit()
+    db.refresh(item)
+    return item

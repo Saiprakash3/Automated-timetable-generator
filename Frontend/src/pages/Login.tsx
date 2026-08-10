@@ -25,6 +25,10 @@ function errorMessageFor(err: ApiError, selectedRoleLabel: string): string {
       return `This account isn't registered as ${selectedRoleLabel}. Check your role selection and try again.`;
     case "ACCOUNT_DISABLED":
       return "This account is inactive. Contact your administrator.";
+    case "NETWORK_ERROR":
+      // Deliberately not "try again" — the request never reached a server, so
+      // retrying unchanged fails identically. Says what's wrong and who fixes it.
+      return "Can't reach the server. Check your connection — if this continues, contact your administrator.";
     default:
       return err.message || "Something went wrong. Please try again.";
   }

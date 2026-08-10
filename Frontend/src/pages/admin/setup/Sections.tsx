@@ -2,8 +2,11 @@ import { useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useSectionData } from "@/hooks/useSectionData";
+import { useSectionData, removeSection } from "@/hooks/useSectionData";
 import { AddSectionDialog } from "./AddSectionDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { Section } from "@/types";
 
 /** Same structure as Faculty.tsx / Rooms.tsx — see Faculty.tsx's notes on the
  *  omitted checkbox column and the disabled Import button; both apply here too.
@@ -12,6 +15,8 @@ import { AddSectionDialog } from "./AddSectionDialog";
 export default function SectionsSetup() {
   const sections = useSectionData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Section | null>(null);
+  const [deleting, setDeleting] = useState<Section | null>(null);
   const sorted = [...sections].sort((a, b) => a.year - b.year || a.name.localeCompare(b.name));
 
   return (
@@ -54,6 +59,7 @@ export default function SectionsSetup() {
                 <TableHead>Year</TableHead>
                 <TableHead>Section</TableHead>
                 <TableHead className="text-right">Student count</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -62,6 +68,13 @@ export default function SectionsSetup() {
                   <TableCell className="text-muted-foreground">Year {s.year}</TableCell>
                   <TableCell className="font-medium text-foreground">{s.name}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{s.studentCount}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={`${s.year}${s.name}`}
+                      onEdit={() => { setEditing(s); setAddOpen(true); }}
+                      onDelete={() => setDeleting(s)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -69,7 +82,18 @@ export default function SectionsSetup() {
         </div>
       )}
 
-      <AddSectionDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddSectionDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? `${deleting.year}${deleting.name}` : ""}
+        categoryLabel="section list"
+        onConfirm={() => removeSection(deleting!.id)}
+      />
     </div>
   );
 }

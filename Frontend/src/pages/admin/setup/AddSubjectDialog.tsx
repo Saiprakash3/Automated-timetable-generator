@@ -1,16 +1,18 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { addSubject } from "@/hooks/useSubjectData";
+import { addSubject, updateSubject } from "@/hooks/useSubjectData";
 import { useFacultyData } from "@/hooks/useFacultyData";
-import type { SubjectType } from "@/types";
+import type { SubjectType, Subject } from "@/types";
 
 interface AddSubjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Edit mode when set: same form, pre-filled (PATTERNS.md Pattern 9.2). */
+  editing?: Subject | null;
 }
 
 const TYPE_LABELS: Record<SubjectType, string> = {
@@ -26,7 +28,7 @@ const TYPE_LABELS: Record<SubjectType, string> = {
  * store the Faculty page reads/writes, so a faculty member added there
  * shows up here immediately without a page reload.
  */
-export function AddSubjectDialog({ open, onOpenChange }: AddSubjectDialogProps) {
+export function AddSubjectDialog({ open, onOpenChange, editing }: AddSubjectDialogProps) {
   const faculty = useFacultyData();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -45,10 +47,25 @@ export function AddSubjectDialog({ open, onOpenChange }: AddSubjectDialogProps) 
   const creditsNum = Number(credits);
   const isValid = name.trim() !== "" && code.trim() !== "" && credits.trim() !== "" && creditsNum > 0 && defaultFacultyId !== "";
 
+  const isEdit = !!editing;
+
+  // Pre-fill on open. A blank 'edit' form is just a second Add form:
+  // you can't see what you're correcting, and untouched fields blank out.
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setCode(editing?.code ?? "");
+    setCredits(editing ? String(editing.credits) : "");
+    setType(editing?.type ?? "regular");
+    setDefaultFacultyId(editing?.defaultFacultyId ?? "");
+  }, [open, editing]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid) return;
-    addSubject({ name: name.trim(), code: code.trim(), credits: creditsNum, type, defaultFacultyId });
+    const record = { name: name.trim(), code: code.trim(), credits: creditsNum, type, defaultFacultyId };
+    if (editing) void updateSubject(editing.id, record);
+    else void addSubject(record);
     reset();
     onOpenChange(false);
   }
@@ -63,7 +80,7 @@ export function AddSubjectDialog({ open, onOpenChange }: AddSubjectDialogProps) 
     >
       <DialogContent className="rounded-lg sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add subject</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit subject" : "Add subject"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -127,7 +144,7 @@ export function AddSubjectDialog({ open, onOpenChange }: AddSubjectDialogProps) 
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid}>
-              Add subject
+              {isEdit ? "Save changes" : "Add subject"}
             </Button>
           </DialogFooter>
         </form>

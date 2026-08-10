@@ -1,10 +1,31 @@
-"""Conflict detection engine"""
+"""Conflict detection engine.
+
+Realigned to the taxonomy 2026-08-01. This module previously numbered its own
+checks #1–#7, which collided with INTERACTION_DECISIONS.md §1.2's #1–#18 while
+meaning something different — its "Check #4" was the lab-coordinator load rule,
+while taxonomy #4 is room double-booking. Anyone cross-referencing the two read
+the wrong rule. Every emitted conflict now carries the taxonomy `code`.
+
+Two severities also contradicted §1.2 and were corrected: the lab-block rule
+(#10) emitted `warning` where the taxonomy says Blocking, and the weekly
+faculty load (#3) emitted `informational` where §1.2 says Warning.
+
+Two rules implemented here have no taxonomy entry at all — lab-coordinator
+daily and weekly load. They are real, config-backed rules, so they are now
+documented as #19/#20 rather than left as silent extras.
+"""
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.models import Timetable, TimetableEntry
 from app.config import Settings
 from typing import List, Dict
 from datetime import datetime
+
+
+# A lab block must stay inside one half-day — it may not cross the 12:00–1:00
+# lunch break (INTERACTION_DECISIONS.md §8.2, conflict #10).
+PRE_LUNCH = [1, 2, 3]
+POST_LUNCH = [4, 5, 6]
 
 
 class ConflictService:
@@ -60,7 +81,7 @@ class ConflictService:
         conflicts = []
         conflict_counter = 1
 
-        # Check #1: Faculty double-booking
+        # Taxonomy #1 — Faculty double-booking
         conflicts.extend(
             ConflictService._check_faculty_double_booking(
                 all_entries, proposed_entries, conflict_counter
@@ -70,7 +91,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "faculty_double_booking"]
         )
 
-        # Check #2: Faculty daily period limit
+        # Taxonomy #3 — Faculty overload (daily)
         conflicts.extend(
             ConflictService._check_faculty_daily_limit(
                 all_entries, proposed_entries, settings, conflict_counter
@@ -80,7 +101,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "faculty_daily_period_limit"]
         )
 
-        # Check #3: Faculty weekly day limit
+        # Taxonomy #3 — Faculty overload (weekly)
         conflicts.extend(
             ConflictService._check_faculty_weekly_limit(
                 all_entries, proposed_entries, settings, conflict_counter
@@ -90,7 +111,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "faculty_weekly_day_limit"]
         )
 
-        # Check #4: Lab coordinator daily limit
+        # Taxonomy #19 — Lab coordinator daily load
         conflicts.extend(
             ConflictService._check_lab_coord_daily_limit(
                 all_entries, proposed_entries, settings, conflict_counter
@@ -100,7 +121,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "lab_coordinator_daily_limit"]
         )
 
-        # Check #5: Lab coordinator weekly day limit
+        # Taxonomy #20 — Lab coordinator weekly load
         conflicts.extend(
             ConflictService._check_lab_coord_weekly_limit(
                 all_entries, proposed_entries, settings, conflict_counter
@@ -110,7 +131,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "lab_coordinator_weekly_day_limit"]
         )
 
-        # Check #6: Room double-booking
+        # Taxonomy #4 — Room double-booking
         conflicts.extend(
             ConflictService._check_room_double_booking(
                 all_entries, proposed_entries, conflict_counter
@@ -120,7 +141,7 @@ class ConflictService:
             [c for c in conflicts if c["type"] == "room_double_booking"]
         )
 
-        # Check #7: Lab continuity
+        # Taxonomy #10 — Lab block validity
         conflicts.extend(
             ConflictService._check_lab_continuity(
                 proposed_entries, conflict_counter
@@ -147,7 +168,7 @@ class ConflictService:
     def _check_faculty_double_booking(
         all_entries: List[dict], proposed_entries: List[dict], counter: int
     ) -> List[dict]:
-        """Check #1: Faculty double-booking (BLOCKING)"""
+        """Taxonomy #1 — Faculty double-booking (BLOCKING)."""
         conflicts = []
         faculty_conflicts = {}
 
@@ -188,6 +209,7 @@ class ConflictService:
                 {
                     "id": f"conflict_{counter}",
                     "type": "faculty_double_booking",
+                        "code": 1,
                     "severity": "blocking",
                     "message": f"{data['faculty_name']} is already scheduled for {data['other_subject']} at this time.",
                     "affectedEntries": list(data["entries"]),
@@ -201,7 +223,7 @@ class ConflictService:
     def _check_faculty_daily_limit(
         all_entries: List[dict], proposed_entries: List[dict], settings: Settings, counter: int
     ) -> List[dict]:
-        """Check #2: Faculty daily period limit (WARNING)"""
+        """Taxonomy #3 — Faculty overload, daily half (WARNING)."""
         conflicts = []
         max_periods = settings.faculty_max_periods_per_day
 
@@ -237,6 +259,7 @@ class ConflictService:
                         {
                             "id": f"conflict_{counter}",
                             "type": "faculty_daily_period_limit",
+                        "code": 3,
                             "severity": "warning",
                             "message": f"{data['faculty_name']} would exceed {max_periods} periods on {data['day']} (has {data['total_periods']}).",
                             "affectedEntries": affected,
@@ -250,7 +273,7 @@ class ConflictService:
     def _check_faculty_weekly_limit(
         all_entries: List[dict], proposed_entries: List[dict], settings: Settings, counter: int
     ) -> List[dict]:
-        """Check #3: Faculty weekly day limit (INFORMATIONAL)"""
+        """Taxonomy #3 — Faculty overload, weekly half (WARNING per §1.2)."""
         conflicts = []
         max_days = settings.faculty_max_days_per_week
 
@@ -281,6 +304,7 @@ class ConflictService:
                         {
                             "id": f"conflict_{counter}",
                             "type": "faculty_weekly_day_limit",
+                        "code": 3,
                             "severity": "informational",
                             "message": f"{faculty_names[faculty_id]} would teach {len(days)} days this week (beyond {max_days}-day preference).",
                             "affectedEntries": list(proposed_faculty),
@@ -294,7 +318,7 @@ class ConflictService:
     def _check_lab_coord_daily_limit(
         all_entries: List[dict], proposed_entries: List[dict], settings: Settings, counter: int
     ) -> List[dict]:
-        """Check #4: Lab coordinator daily period limit (WARNING)"""
+        """Taxonomy #19 — Lab coordinator daily load (WARNING)."""
         conflicts = []
         max_periods = settings.lab_coordinator_max_periods_per_day
 
@@ -329,6 +353,7 @@ class ConflictService:
                         {
                             "id": f"conflict_{counter}",
                             "type": "lab_coordinator_daily_limit",
+                        "code": 19,
                             "severity": "warning",
                             "message": f"Lab coordinator would exceed {max_periods} periods on {data['day']} (has {data['total_periods']}).",
                             "affectedEntries": affected,
@@ -342,7 +367,7 @@ class ConflictService:
     def _check_lab_coord_weekly_limit(
         all_entries: List[dict], proposed_entries: List[dict], settings: Settings, counter: int
     ) -> List[dict]:
-        """Check #5: Lab coordinator weekly day limit (INFORMATIONAL)"""
+        """Taxonomy #20 — Lab coordinator weekly load (INFORMATIONAL)."""
         conflicts = []
         max_days = settings.lab_coordinator_max_days_per_week
 
@@ -371,6 +396,7 @@ class ConflictService:
                         {
                             "id": f"conflict_{counter}",
                             "type": "lab_coordinator_weekly_day_limit",
+                        "code": 20,
                             "severity": "informational",
                             "message": f"Lab coordinator would have assignments on {len(days)} days (beyond {max_days}-day preference).",
                             "affectedEntries": list(proposed_lab_coords),
@@ -384,7 +410,7 @@ class ConflictService:
     def _check_room_double_booking(
         all_entries: List[dict], proposed_entries: List[dict], counter: int
     ) -> List[dict]:
-        """Check #6: Room double-booking (BLOCKING)"""
+        """Taxonomy #4 — Room double-booking (BLOCKING)."""
         conflicts = []
         room_conflicts = {}
 
@@ -424,6 +450,7 @@ class ConflictService:
                 {
                     "id": f"conflict_{counter}",
                     "type": "room_double_booking",
+                        "code": 4,
                     "severity": "blocking",
                     "message": f"{data['room']} is already booked for {data['other_subject']} at this time.",
                     "affectedEntries": list(data["entries"]),
@@ -435,20 +462,41 @@ class ConflictService:
 
     @staticmethod
     def _check_lab_continuity(proposed_entries: List[dict], counter: int) -> List[dict]:
-        """Check #7: Lab continuity - labs should be continuous (WARNING)"""
+        """Taxonomy #10 — Lab block invalid or straddling lunch (BLOCKING)."""
         conflicts = []
 
         for entry in proposed_entries:
             if entry.get("entry_type") != "lab":
                 continue
 
-            if entry["periodStart"] == entry["periodEnd"]:
+            start, end = entry["periodStart"], entry["periodEnd"]
+            subject = entry.get("subject", "Lab")
+
+            if start == end:
                 conflicts.append(
                     {
                         "id": f"conflict_{counter}",
                         "type": "lab_not_continuous",
-                        "severity": "warning",
-                        "message": f"{entry.get('subject', 'Lab')} is only 1 period — labs should be continuous 2+ periods.",
+                        "code": 10,
+                        "severity": "blocking",
+                        "message": f"{subject} is only 1 period — a lab runs for two consecutive periods.",
+                        "affectedEntries": [entry.get("id", "unknown")],
+                    }
+                )
+                counter += 1
+            elif not (
+                (start in PRE_LUNCH and end in PRE_LUNCH) or (start in POST_LUNCH and end in POST_LUNCH)
+            ):
+                # The other half of §8.2, which this check never covered: a
+                # two-period block is not automatically legal — it must sit
+                # inside one half-day. P3–P4 spans the lunch break.
+                conflicts.append(
+                    {
+                        "id": f"conflict_{counter}",
+                        "type": "lab_crosses_lunch",
+                        "code": 10,
+                        "severity": "blocking",
+                        "message": f"{subject} runs across the lunch break — a lab must stay within one half of the day.",
                         "affectedEntries": [entry.get("id", "unknown")],
                     }
                 )

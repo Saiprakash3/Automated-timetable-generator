@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { addElectiveBasket, useElectiveBasketData } from "@/hooks/useElectiveBasketData";
+import { addElectiveBasket, updateElectiveBasket, useElectiveBasketData } from "@/hooks/useElectiveBasketData";
 import { useSubjectData } from "@/hooks/useSubjectData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFacultyData } from "@/hooks/useFacultyData";
@@ -27,7 +27,9 @@ const YEAR_OPTIONS = [3, 4];
  */
 export default function ElectiveBasketConfig() {
   const navigate = useNavigate();
+  const { basketId } = useParams();
   const existingBaskets = useElectiveBasketData();
+  const editing = basketId ? existingBaskets.find((b) => b.id === basketId) ?? null : null;
   const subjects = useSubjectData().filter((s) => s.type === "elective");
   const sections = useSectionData();
   const faculty = useFacultyData();
@@ -43,11 +45,26 @@ export default function ElectiveBasketConfig() {
   const [draftFacultyId, setDraftFacultyId] = useState("");
   const [draftRoomId, setDraftRoomId] = useState("");
 
+  // Seed from the basket being edited. Runs when the record arrives, since the
+  // store fetches async and is empty on first render.
+  useEffect(() => {
+    if (!editing) return;
+    setName(editing.name);
+    setYear(String(editing.year));
+    setPeriod(String(editing.period));
+    setSectionIds(editing.sectionIds);
+    setElectives(editing.electives);
+  }, [editing]);
+
   const yearSections = sections.filter((s) => String(s.year) === year);
 
   /** Conflict #12 (INTERACTION_DECISIONS.md): a period already taken by
-   *  another basket in the same year is not offered. */
-  const takenPeriods = new Set(existingBaskets.filter((b) => String(b.year) === year).map((b) => b.period));
+   *  another basket in the same year is not offered. The basket being edited
+   *  is excluded — its own period must stay selectable, or reopening a basket
+   *  for edit would show its current slot as unavailable. */
+  const takenPeriods = new Set(
+    existingBaskets.filter((b) => String(b.year) === year && b.id !== editing?.id).map((b) => b.period),
+  );
   const availablePeriods = TIME_SLOTS.filter((t) => t.type === "class" && !takenPeriods.has(t.period as number));
 
   const availableSubjects = subjects.filter((s) => !electives.some((e) => e.subjectId === s.id));
@@ -75,13 +92,15 @@ export default function ElectiveBasketConfig() {
 
   function handleSave() {
     if (!isValid) return;
-    addElectiveBasket({
+    const record = {
       name: name.trim(),
       year: Number(year),
       period: Number(period),
       sectionIds,
       electives,
-    });
+    };
+    if (editing) void updateElectiveBasket(editing.id, record);
+    else void addElectiveBasket(record);
     navigate("/setup/elective-baskets");
   }
 
@@ -92,7 +111,9 @@ export default function ElectiveBasketConfig() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="font-heading text-h1 font-semibold text-foreground">Configure Elective Basket</h1>
+        <h1 className="font-heading text-h1 font-semibold text-foreground">
+            {editing ? "Edit Elective Basket" : "Configure Elective Basket"}
+          </h1>
         <p className="font-body text-muted-foreground">
           Define which electives, faculty, rooms, sections, and time slot make up this basket.
         </p>
@@ -260,7 +281,7 @@ export default function ElectiveBasketConfig() {
           Cancel
         </Button>
         <Button type="button" onClick={handleSave} disabled={!isValid}>
-          Save basket
+          {editing ? "Save changes" : "Save basket"}
         </Button>
       </div>
     </div>

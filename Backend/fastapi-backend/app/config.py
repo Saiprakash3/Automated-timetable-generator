@@ -1,6 +1,14 @@
 """Application configuration using Pydantic Settings"""
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchored to the project directory rather than left as a bare ".env", which
+# pydantic-settings resolves against the *current working directory*. Starting
+# uvicorn from the repo root (or anywhere but this folder) otherwise loads no
+# env file at all, and the first symptom is an opaque
+# "Expected string or URL object, got None" from create_engine.
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -64,7 +72,7 @@ class Settings(BaseSettings):
 
         return db_url
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, case_sensitive=False, extra="ignore")
 
 
 settings = Settings()

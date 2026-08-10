@@ -1,17 +1,20 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { addLab } from "@/hooks/useLabData";
+import { addLab, updateLab } from "@/hooks/useLabData";
+import type { Lab } from "@/types";
 
 interface AddLabDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Edit mode when set: same form, pre-filled (PATTERNS.md Pattern 9.2). */
+  editing?: Lab | null;
 }
 
-export function AddLabDialog({ open, onOpenChange }: AddLabDialogProps) {
+export function AddLabDialog({ open, onOpenChange, editing }: AddLabDialogProps) {
   const [name, setName] = useState("");
   const [room, setRoom] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -29,10 +32,25 @@ export function AddLabDialog({ open, onOpenChange }: AddLabDialogProps) {
   const capacityNum = Number(capacity);
   const isValid = name.trim() !== "" && room.trim() !== "" && capacity.trim() !== "" && capacityNum > 0;
 
+  const isEdit = !!editing;
+
+  // Pre-fill on open. A blank 'edit' form is just a second Add form:
+  // you can't see what you're correcting, and untouched fields blank out.
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? "");
+    setRoom(editing?.room ?? "");
+    setCapacity(editing ? String(editing.capacity) : "");
+    setEquipment(editing?.equipment ?? "");
+    setAvailable(editing?.available ?? true);
+  }, [open, editing]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid) return;
-    addLab({ name: name.trim(), room: room.trim(), capacity: capacityNum, equipment: equipment.trim(), available });
+    const record = { name: name.trim(), room: room.trim(), capacity: capacityNum, equipment: equipment.trim(), available };
+    if (editing) void updateLab(editing.id, record);
+    else void addLab(record);
     reset();
     onOpenChange(false);
   }
@@ -47,7 +65,7 @@ export function AddLabDialog({ open, onOpenChange }: AddLabDialogProps) {
     >
       <DialogContent className="rounded-lg sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add lab</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit lab" : "Add lab"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -96,7 +114,7 @@ export function AddLabDialog({ open, onOpenChange }: AddLabDialogProps) {
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid}>
-              Add lab
+              {isEdit ? "Save changes" : "Add lab"}
             </Button>
           </DialogFooter>
         </form>

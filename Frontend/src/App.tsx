@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useSession } from "@/hooks/useSession";
 import { Toaster } from "@/components/ui/sonner";
-import { LANDING_ROUTE } from "@/lib/landingRoute";
 import type { Role } from "@/types";
 import Login from "@/pages/Login";
 import AdminShell from "@/layouts/AdminShell";
@@ -22,6 +21,8 @@ import HodApprovals from "@/pages/hod/Approvals";
 import HodApprovalDetail from "@/pages/hod/ApprovalDetail";
 import ReadOnlyShell from "@/layouts/ReadOnlyShell";
 import MyTimetable from "@/pages/readonly/MyTimetable";
+import { NotFound, NoAccess } from "@/pages/NotFound";
+import { ErrorBoundary } from "@/components/domain/ErrorBoundary";
 
 /**
  * Route guard, as a layout route (renders <Outlet /> when authenticated
@@ -46,7 +47,10 @@ function RequireAuth() {
 function RequireRole({ allow }: { allow: Role[] }) {
   const { user } = useSession();
   if (!user) return null;
-  if (!allow.includes(user.role)) return <Navigate to={LANDING_ROUTE[user.role]} replace />;
+  // Shows why, rather than silently redirecting. The old `<Navigate>` moved the
+  // URL out from under the user with no explanation, which reads as a broken
+  // link rather than a permission boundary.
+  if (!allow.includes(user.role)) return <NoAccess />;
   return <Outlet />;
 }
 
@@ -61,18 +65,24 @@ function ComingSoon({ title }: { title: string }) {
 }
 
 /** Distinguishes a genuinely unmatched URL from "not logged in" — an
- *  authenticated user hitting a typo'd link shouldn't look logged out. */
-function NotFound() {
+ *  authenticated user hitting a typo'd link shouldn't look logged out. A
+ *  signed-out user is sent to Login; a signed-in one gets a real 404 with a
+ *  route home (pages/NotFound.tsx). */
+function NotFoundRoute() {
   const { user } = useSession();
   if (!user) return <Navigate to="/login" replace />;
-  return <ComingSoon title="Page not found" />;
+  return <NotFound />;
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Toaster position="top-right" />
-      <Routes>
+    // Outside BrowserRouter on purpose: a throw inside a route would otherwise
+    // have to be caught by something the router still owns, and the router
+    // itself is part of what can fail. Placed here it catches everything.
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Toaster position="top-right" />
+        <Routes>
         <Route path="/login" element={<Login />} />
 
         <Route element={<RequireAuth />}>
@@ -89,6 +99,10 @@ export default function App() {
               <Route path="/setup/subject-faculty-mapping" element={<SubjectFacultyMappingSetup />} />
               <Route path="/setup/elective-baskets" element={<ElectiveBasketsSetup />} />
               <Route path="/setup/elective-baskets/new" element={<ElectiveBasketConfig />} />
+              {/* Same screen in edit mode — a basket is built across nested
+                  steps, so it reopens its own config page rather than a
+                  pre-filled dialog like the other categories. */}
+              <Route path="/setup/elective-baskets/:basketId/edit" element={<ElectiveBasketConfig />} />
               <Route path="/setup/:category" element={<ComingSoon title="Setup category" />} />
               <Route path="/timetable" element={<TimetableGenerate />} />
             </Route>
@@ -111,8 +125,9 @@ export default function App() {
           </Route>
         </Route>
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<NotFoundRoute />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

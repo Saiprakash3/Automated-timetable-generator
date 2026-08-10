@@ -1,14 +1,17 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { addSection } from "@/hooks/useSectionData";
+import { addSection, updateSection } from "@/hooks/useSectionData";
+import type { Section } from "@/types";
 
 interface AddSectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Edit mode when set: same form, pre-filled (PATTERNS.md Pattern 9.2). */
+  editing?: Section | null;
 }
 
 const YEAR_OPTIONS = [1, 2, 3, 4];
@@ -18,7 +21,7 @@ const YEAR_OPTIONS = [1, 2, 3, 4];
  *  number there would silently create an orphan section. Name stays a plain
  *  Input: section letters aren't a closed set worth hardcoding (some
  *  colleges run past C). */
-export function AddSectionDialog({ open, onOpenChange }: AddSectionDialogProps) {
+export function AddSectionDialog({ open, onOpenChange, editing }: AddSectionDialogProps) {
   const [year, setYear] = useState<string>("");
   const [name, setName] = useState("");
   const [studentCount, setStudentCount] = useState("");
@@ -32,10 +35,23 @@ export function AddSectionDialog({ open, onOpenChange }: AddSectionDialogProps) 
   const studentCountNum = Number(studentCount);
   const isValid = year !== "" && name.trim() !== "" && studentCount.trim() !== "" && studentCountNum > 0;
 
+  const isEdit = !!editing;
+
+  // Pre-fill on open. A blank 'edit' form is just a second Add form:
+  // you can't see what you're correcting, and untouched fields blank out.
+  useEffect(() => {
+    if (!open) return;
+    setYear(editing ? String(editing.year) : year);
+    setName(editing?.name ?? "");
+    setStudentCount(editing ? String(editing.studentCount) : "");
+  }, [open, editing]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid) return;
-    addSection({ year: Number(year), name: name.trim(), studentCount: studentCountNum });
+    const record = { year: Number(year), name: name.trim(), studentCount: studentCountNum };
+    if (editing) void updateSection(editing.id, record);
+    else void addSection(record);
     reset();
     onOpenChange(false);
   }
@@ -50,7 +66,7 @@ export function AddSectionDialog({ open, onOpenChange }: AddSectionDialogProps) 
     >
       <DialogContent className="rounded-lg sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add section</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit section" : "Add section"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -93,7 +109,7 @@ export function AddSectionDialog({ open, onOpenChange }: AddSectionDialogProps) 
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid}>
-              Add section
+              {isEdit ? "Save changes" : "Add section"}
             </Button>
           </DialogFooter>
         </form>

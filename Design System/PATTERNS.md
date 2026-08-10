@@ -451,12 +451,19 @@ Regenerating will replace the current Draft, including any manual edits you've m
 - No lockout after repeated failures — unlimited attempts are allowed, since there's no self-service recovery path to fall back on if an account got locked
 - All cases: same visual treatment (error banner + field flagging), differing only in copy
 
+- **Server unreachable:** the request never arrived — API down, wrong port, or the user is offline. Distinct message, because the fix is neither the password nor the role dropdown.
+
 **Copy templates:**
 ```
 Incorrect ID/email or password.
 This account isn't registered as [selected role]. Check your role selection and try again.
 This account is inactive. Contact your administrator.
+Can't reach the server. Check your connection — if this continues, contact your administrator.
 ```
+
+> ⚠️ **Added 2026-08-01 after this cost real debugging time.** With the API stopped, login showed the catch-all *"Something went wrong. Please try again."* Two things were wrong with it. It reads as a **credentials** failure, sitting where the other three login errors sit — so the natural conclusion is "my password is wrong" or "the backend rejected me", and the actual cause (nothing listening on the port) is invisible. And **"try again" is advice that cannot work**: an unreachable server fails identically on every retry, so the copy sends the user into a loop.
+>
+> `fetch` *rejects* rather than resolving when a request never reaches a server, so this never had an HTTP status or an error code to switch on and fell through to the generic branch. The API client now normalises that rejection into a typed `NETWORK_ERROR`, which means **every** caller — not just Login — can distinguish "the server said no" from "there was no server". Say what is wrong and who can fix it; never offer a retry that is guaranteed to fail.
 
 **What this deliberately excludes:** "Forgot password?" link, self-service reset flow, security questions, email-based recovery, and any attempt-lockout mechanism. The footer line "Trouble logging in? Contact your administrator." is the entire recovery path — this is intentional given the credential model, not an oversight.
 
@@ -552,6 +559,29 @@ This is your final draft. Review all changes carefully before resubmitting — H
 
 **What this is not:** A blocking toast or a disabled Generate button. The warning appears after generation succeeds, as a banner on the resulting Draft screen — Admin is already in the draft, not stopped from getting there.
 
+### 8.4 Draft history — empty state
+
+**Added 2026-08-01.** The Status Pill's destination is the draft-history panel, but that panel had **no designed empty state** — it simply didn't render when there was nothing archived, so the pill pointed at a screen that wasn't there.
+
+**Screen:** `Admin — Draft history (empty)` — Figma `548:11261`.
+
+```
+Draft history
+Past drafts HOD has already reviewed, kept for comparison.
+
+        ⏱  No drafts yet
+        Currently there are no drafts. A draft is kept here once HOD
+        reviews a version and you regenerate, so you can compare them.
+```
+
+The body copy names **what will populate it**, not just that it's empty. "No drafts yet" alone leaves the user unsure whether the feature is broken, unavailable to them, or simply unused — naming the trigger (HOD review → regenerate) turns an empty screen into an explanation of the draft lifecycle.
+
+The lifecycle actions (Regenerate / Send for approval) are **not** on this view, and neither is the "Last edited …" caption — both belong to the editing screen this was cloned from. A history view acts on past drafts, not the current one.
+
+The panel is titled **Draft history**, not "Manage drafts" — with nothing in it there is nothing to manage, and the title has to hold for both states.
+
+See `DOMAIN_COMPONENTS.md` §1 for the consequence this has for when the Status Pill is interactive. Built in both design and frontend 2026-08-01.
+
 ### 8.3 Delete draft — confirmation dialog
 
 **When available:** Admin can delete a draft at two points:
@@ -575,3 +605,108 @@ Description: This will permanently remove Draft [N] from the timetable history. 
 **On confirm:** Draft is removed. If this was the last remaining draft, the draft count resets to 0 — a new timetable cycle starts fresh.
 
 **Note:** Draft count also resets to 0 whenever all drafts are deleted, regardless of whether a new timetable is generated immediately after. The count tracks how many drafts exist in the current cycle, not a lifetime total.
+
+---
+
+## Pattern 9 — Editing and removing a Setup record
+
+> **Added 2026-08-01.** Setup was create-and-read only. Nine screens let Admin *add* a Faculty, Subject, Room, Lab, Section, Coordinator, Mapping, Time Slot or Elective Basket, and nothing let them **correct one**. Reported as: *"there is no edit option in each step — by mistake if admin enters wrong data he should be able to edit the entry."* Delete was half-specified: §1.1 already listed *"Removing a Faculty, Subject, Lab, Room, Section"* and gave the confirmation copy, but no screen had a control that could trigger it. This pattern supplies the missing affordance and the edit flow; §1.1 remains the authority for the removal confirmation itself.
+
+### 9.1 The affordance
+
+Every Setup table row ends with an Actions column — **Edit** and **Delete** Icon Buttons, always visible (`COMPONENTS.md` G.1). Not a hover reveal, not an overflow menu: see G.1's note for why.
+
+### 9.2 Edit a record
+
+**Uses:** the same Dialog as Add Single Record, in an Edit configuration.
+
+Four differences from Add, and only four — reusing the Add form is the point, because a divergent edit form is how the two drift apart:
+
+| | Add | Edit |
+|---|---|---|
+| Title | `Add subject` | `Edit subject` |
+| Fields | empty / placeholder | **pre-filled with the current values** |
+| Confirm button | `Add subject` | `Save changes` |
+| On success toast | `Subject added.` | `Changes saved.` |
+
+**Pre-filling is the whole feature.** An "edit" dialog that opens blank is a second Add dialog wearing a different title — the user cannot see what they are correcting, and any field they leave alone is silently blanked.
+
+**Validation:** identical to Add (Pattern 2.1, inline on blur). An edit that violates a rule the record already violated is still blocked — Save is not a lower bar than Add.
+
+> **Elective Baskets are the one exception, and only to the *container*.** A basket is built on its own full-page config screen rather than the shared dialog (F-06 — the nested "list of electives inside the basket" doesn't fit a small modal), so Edit reopens **that page** pre-filled, not a dialog: `Edit elective basket` with `Save changes`. The four deltas above still hold; only the surface differs. Figma `543:11060`, route `/setup/elective-baskets/:basketId/edit`.
+>
+> Two things this exception forces, both easy to get wrong:
+> - **The basket's own period must stay selectable.** Conflict #12 hides periods already taken by another basket in the same year — computed naively, reopening a basket would hide its *current* slot and show the field as invalid. The basket being edited is excluded from that set.
+> - **Electives are replaced wholesale on save, not diffed.** The page edits the basket as one document; a partial merge would need an identity for rows the UI never tracked. The old rows are removed via `delete-orphan`, verified to leave no orphaned electives behind.
+
+**Cancel** discards changes and closes with no confirmation. The dialog is small, the changes are visible, and an "are you sure" on a two-field form is noise. (This differs deliberately from the Cell Edit Drawer, which holds more state.)
+
+**On confirm:** dialog closes, the row updates in place, success Toast. The row does not re-sort or move even if the edited field is the sort key — a row jumping away from the cursor at the moment of saving reads as data loss. Re-sorting happens on the next load or an explicit re-sort.
+
+### 9.3 Remove a record
+
+Delete **branches on whether the record is still in use** (`INTERACTION_DECISIONS.md` §12.3, decided 2026-08-01). Clicking Delete does not always lead to the same dialog.
+
+```
+Delete clicked
+   ├── no live dependents  → 9.3a  Destructive confirmation  → removed
+   └── has live dependents → 9.3b  Blocked, dependents listed → not removed
+```
+
+"Live dependents" means active configuration — mappings, basket electives, coordinator↔lab links, and the current editable draft. Entries in a **published or archived** timetable do not count; see §12.4 for why (they are snapshots, and counting them would freeze Setup for the whole term).
+
+#### 9.3a No dependents — Destructive confirmation
+
+**Uses:** Confirmation Dialog (**Destructive** variant) — Pattern 1.1, unchanged.
+
+```
+Title: Remove [record name]?
+Description: This will remove [record name] from the [category] list.
+
+[Cancel] [Remove]
+```
+
+> Remove Data Structures?
+> This will remove Data Structures from the subject list.
+> [Cancel] [Remove]
+
+#### 9.3b Has dependents — blocked, and the dependents are shown
+
+**Uses:** Confirmation Dialog (**Reversible** variant — info icon, no destructive action). It is not a confirmation: there is nothing to confirm, so no Destructive button appears.
+
+```
+Title: Can't remove [record name]
+Description: It's still used in [N] places. Reassign or remove those first.
+
+  [ [N] [dependent type]        [identifying detail] ]
+  [ [N] [dependent type]        [identifying detail] ]
+
+[Close] [View [primary dependent type]]
+```
+
+**Example:**
+> ⓘ **Can't remove Data Structures**
+> It's still used in 2 places. Reassign or remove those first.
+> | 2 Subject–Faculty mappings | III-CSE-A, B |
+> | 1 elective basket | 3rd Year — Basket A |
+> [Close] [View mappings]
+
+Three rules make this a block rather than a dead end — a bare *"can't delete this"* is worse than the problem it prevents:
+
+1. **List the dependents, don't just count them.** "Used in 2 places" alone sends Admin hunting across nine screens.
+2. **Carry identifying detail** on each row (*which* sections, *which* basket), so the target is recognisable before navigating.
+3. **The primary action navigates.** `View mappings` goes to the dependent, filtered to this record where possible. Close is the secondary. The exit from a block is a route onward, not dismissal.
+
+When more than one dependent type exists, the primary action targets the largest group; the rest are reachable from their listed rows.
+
+**Figma:** blocked state `529:10812`; destructive state `523:11413`.
+
+### 9.4 What is not editable
+
+Row actions appear only on records Admin owns in Setup. They do **not** appear on:
+
+- **Time Slot Grid** — the one Setup screen deliberately excluded. `INTERACTION_DECISIONS.md` §8.1 settled the daily schedule as *"a fixed college-wide constant — not configurable by Admin through the Time Slot Grid setup screen"* (confirmed 2026-07-16). Putting Edit/Delete on those rows would offer control the system does not grant, and would let Admin delete the Lunch break — which §8.2's lab-placement rules depend on. The screen stays a read-only reference. Its own open question (keep as reference vs. drop from Setup entirely) is unchanged by this pattern.
+- **Generated timetable entries** — edited through the Cell Edit Drawer (§10), which enforces conflict rules the Setup form has no concept of.
+- **Read-only role views**, which have no mutating actions at all.
+
+> The general rule: a row gets Edit/Delete when Admin *authored* the record. Where the data is a constant the product asserts, showing an edit control is a false affordance — the same class of bug as the un-clickable Status Pill (`DOMAIN_COMPONENTS.md` §1), just inverted.

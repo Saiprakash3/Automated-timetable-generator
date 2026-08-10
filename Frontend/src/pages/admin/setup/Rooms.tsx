@@ -2,14 +2,19 @@ import { useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useRoomData } from "@/hooks/useRoomData";
+import { useRoomData, removeRoom } from "@/hooks/useRoomData";
 import { AddRoomDialog } from "./AddRoomDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { Room } from "@/types";
 
 /** Same structure as Faculty.tsx / Subjects.tsx — see Faculty.tsx's notes on
  *  the omitted checkbox column and the disabled Import button; both apply here too. */
 export default function RoomsSetup() {
   const rooms = useRoomData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Room | null>(null);
+  const [deleting, setDeleting] = useState<Room | null>(null);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -50,6 +55,7 @@ export default function RoomsSetup() {
               <TableRow>
                 <TableHead>Room</TableHead>
                 <TableHead className="text-right">Capacity</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -57,6 +63,13 @@ export default function RoomsSetup() {
                 <TableRow key={r.id}>
                   <TableCell className="font-medium text-foreground">{r.number}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{r.capacity}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={r.number}
+                      onEdit={() => { setEditing(r); setAddOpen(true); }}
+                      onDelete={() => setDeleting(r)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -64,7 +77,18 @@ export default function RoomsSetup() {
         </div>
       )}
 
-      <AddRoomDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddRoomDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? deleting.number : ""}
+        categoryLabel="room list"
+        onConfirm={() => removeRoom(deleting!.id)}
+      />
     </div>
   );
 }

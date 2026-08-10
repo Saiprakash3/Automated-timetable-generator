@@ -1,18 +1,21 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { addRoom } from "@/hooks/useRoomData";
+import { addRoom, updateRoom } from "@/hooks/useRoomData";
+import type { Room } from "@/types";
 
 interface AddRoomDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Edit mode when set: same form, pre-filled (PATTERNS.md Pattern 9.2). */
+  editing?: Room | null;
 }
 
 /** Simplest of the three Add dialogs so far — no cross-entity select (unlike
  *  Subjects' Default Faculty), no boolean toggle (unlike Faculty's switch). */
-export function AddRoomDialog({ open, onOpenChange }: AddRoomDialogProps) {
+export function AddRoomDialog({ open, onOpenChange, editing }: AddRoomDialogProps) {
   const [number, setNumber] = useState("");
   const [capacity, setCapacity] = useState("");
 
@@ -24,10 +27,22 @@ export function AddRoomDialog({ open, onOpenChange }: AddRoomDialogProps) {
   const capacityNum = Number(capacity);
   const isValid = number.trim() !== "" && capacity.trim() !== "" && capacityNum > 0;
 
+  const isEdit = !!editing;
+
+  // Pre-fill on open. A blank 'edit' form is just a second Add form:
+  // you can't see what you're correcting, and untouched fields blank out.
+  useEffect(() => {
+    if (!open) return;
+    setNumber(editing?.number ?? "");
+    setCapacity(editing ? String(editing.capacity) : "");
+  }, [open, editing]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!isValid) return;
-    addRoom({ number: number.trim(), capacity: capacityNum });
+    const record = { number: number.trim(), capacity: capacityNum };
+    if (editing) void updateRoom(editing.id, record);
+    else void addRoom(record);
     reset();
     onOpenChange(false);
   }
@@ -42,7 +57,7 @@ export function AddRoomDialog({ open, onOpenChange }: AddRoomDialogProps) {
     >
       <DialogContent className="rounded-lg sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add room</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit room" : "Add room"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -68,7 +83,7 @@ export function AddRoomDialog({ open, onOpenChange }: AddRoomDialogProps) {
               Cancel
             </Button>
             <Button type="submit" disabled={!isValid}>
-              Add room
+              {isEdit ? "Save changes" : "Add room"}
             </Button>
           </DialogFooter>
         </form>

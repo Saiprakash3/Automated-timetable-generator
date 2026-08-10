@@ -2,11 +2,14 @@ import { useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { useSubjectFacultyMappingData } from "@/hooks/useSubjectFacultyMappingData";
+import { useSubjectFacultyMappingData, removeMapping } from "@/hooks/useSubjectFacultyMappingData";
 import { useSubjectData } from "@/hooks/useSubjectData";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFacultyData } from "@/hooks/useFacultyData";
 import { AddMappingDialog } from "./AddMappingDialog";
+import { RowActions } from "@/components/domain/RowActions";
+import { DeleteRecordDialog } from "@/components/domain/DeleteRecordDialog";
+import type { SubjectFacultyMapping } from "@/types";
 
 /** Same structure as Faculty.tsx — see its notes on the omitted checkbox
  *  column and the disabled Import button; both apply here too. All three
@@ -18,6 +21,8 @@ export default function SubjectFacultyMappingSetup() {
   const sections = useSectionData();
   const faculty = useFacultyData();
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<SubjectFacultyMapping | null>(null);
+  const [deleting, setDeleting] = useState<SubjectFacultyMapping | null>(null);
 
   const subjectName = (id: string) => subjects.find((s) => s.id === id)?.name ?? id;
   const sectionName = (id: string) => {
@@ -66,6 +71,7 @@ export default function SubjectFacultyMappingSetup() {
                 <TableHead>Subject</TableHead>
                 <TableHead>Section</TableHead>
                 <TableHead>Faculty</TableHead>
+                <TableHead className="w-[88px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,6 +80,13 @@ export default function SubjectFacultyMappingSetup() {
                   <TableCell className="font-medium text-foreground">{subjectName(m.subjectId)}</TableCell>
                   <TableCell className="text-muted-foreground">{sectionName(m.sectionId)}</TableCell>
                   <TableCell className="text-muted-foreground">{facultyName(m.facultyId)}</TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={"this mapping"}
+                      onEdit={() => { setEditing(m); setAddOpen(true); }}
+                      onDelete={() => setDeleting(m)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -81,7 +94,18 @@ export default function SubjectFacultyMappingSetup() {
         </div>
       )}
 
-      <AddMappingDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddMappingDialog
+        open={addOpen}
+        onOpenChange={(next) => { setAddOpen(next); if (!next) setEditing(null); }}
+        editing={editing}
+      />
+      <DeleteRecordDialog
+        open={!!deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        recordName={deleting ? "this mapping" : ""}
+        categoryLabel="mapping list"
+        onConfirm={() => removeMapping(deleting!.id)}
+      />
     </div>
   );
 }
