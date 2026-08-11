@@ -101,10 +101,12 @@ class TimetableGeneratorService:
         faculty_busy = set()   # (faculty_id, day, period)
         room_busy = set()      # (room, day, period)
         section_busy = set()   # (day, period) — this section can be in one place
+        # Track periods per subject to enforce max_periods_per_week constraint
+        subject_periods_per_week = {}  # subject_id -> count
         gaps = 0
         room_cycle = 0
 
-        def block_free(fid, room, day, periods):
+        def block_free(fid, room, day, periods, subject_id=None):
             for p in periods:
                 if (day, p) in section_busy:
                     return False
@@ -112,14 +114,23 @@ class TimetableGeneratorService:
                     return False
                 if (room, day, p) in room_busy:
                     return False
+            # Check subject period constraints
+            if subject_id:
+                subject = subjects.get(subject_id)
+                if subject and subject.max_periods_per_week:
+                    current_periods = subject_periods_per_week.get(subject_id, 0)
+                    if current_periods + len(periods) > subject.max_periods_per_week:
+                        return False
             return True
 
-        def claim(fid, room, day, periods):
+        def claim(fid, room, day, periods, subject_id=None):
             for p in periods:
                 section_busy.add((day, p))
                 if fid:
                     faculty_busy.add((fid, day, p))
                 room_busy.add((room, day, p))
+            if subject_id:
+                subject_periods_per_week[subject_id] = subject_periods_per_week.get(subject_id, 0) + len(periods)
 
         for item in work:
             subj = item["subject"]
@@ -137,8 +148,8 @@ class TimetableGeneratorService:
                             pair = [half[i], half[i + 1]]
                             for lab in candidates:
                                 room_name = getattr(lab, "room", None) or getattr(lab, "room_number", None) or lab.name
-                                if block_free(fid, room_name, day, pair):
-                                    claim(fid, room_name, day, pair)
+                                if block_free(fid, room_name, day, pair, subj.id):
+                                    claim(fid, room_name, day, pair, subj.id)
                                     entries.append({
                                         "id": f"ent-{uuid.uuid4().hex[:8]}",
                                         "day": day,
@@ -166,8 +177,8 @@ class TimetableGeneratorService:
                         # pile into room #1 and starve later ones.
                         for k in range(len(rooms)):
                             room = rooms[(room_cycle + k) % len(rooms)]
-                            if block_free(fid, room.room_number, day, [period]):
-                                claim(fid, room.room_number, day, [period])
+                            if block_free(fid, room.room_number, day, [period], subj.id):
+                                claim(fid, room.room_number, day, [period], subj.id)
                                 room_cycle += 1
                                 entries.append({
                                     "id": f"ent-{uuid.uuid4().hex[:8]}",

@@ -39,6 +39,9 @@ class SubjectModel(Base):
     credits = Column(Integer, nullable=True)
     subject_type = Column(String, nullable=True)  # regular | lab | elective
     default_faculty_id = Column(String, nullable=True)
+    # Period constraints for timetable generation
+    max_periods_per_week = Column(Integer, nullable=True, default=3)
+    total_periods_required = Column(Integer, nullable=True, default=45)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

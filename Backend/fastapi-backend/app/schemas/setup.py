@@ -31,6 +31,8 @@ class SubjectBase(BaseModel):
     credits: Optional[int] = None
     subject_type: Optional[str] = None  # regular | lab | elective
     default_faculty_id: Optional[str] = None
+    max_periods_per_week: int = 3
+    total_periods_required: int = 45
 
 
 class SubjectCreate(SubjectBase):
